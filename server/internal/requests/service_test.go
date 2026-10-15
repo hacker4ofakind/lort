@@ -148,3 +148,37 @@ func TestRecomputeTrendingSkipsFinished(t *testing.T) {
 		t.Errorf("scores = %v / %v", open.GetFloat("trendScore"), done.GetFloat("trendScore"))
 	}
 }
+
+func TestToggleVoteRespectsAccess(t *testing.T) {
+	svc, app, _, mara := setup(t)
+	private := testutil.Board(t, app, "Internal", false, false)
+	r := testutil.Request(t, app, private, mara, "Secret", "pending", 0)
+	devon := testutil.User(t, app, "devon@example.com")
+	if _, _, err := svc.ToggleVote(r.Id, devon.Id); !errors.Is(err, requests.ErrNotFound) {
+		t.Fatalf("outsider vote on a private board err = %v", err)
+	}
+	if _, _, err := svc.ToggleVote(r.Id, mara.Id); err != nil {
+		t.Fatalf("author vote err = %v", err)
+	}
+	devon.Set("isAdmin", true)
+	if err := app.Save(devon); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := svc.ToggleVote(r.Id, devon.Id); err != nil {
+		t.Fatalf("team vote err = %v", err)
+	}
+}
+
+func TestRecomputeTrendingOnlyTouchesTrendScore(t *testing.T) {
+	svc, app, board, mara := setup(t)
+	r := testutil.Request(t, app, board, mara, "Open", "pending", 4)
+	before := r.GetDateTime("updated")
+	svc.Now = func() time.Time { return time.Now().Add(time.Hour) }
+	if err := svc.RecomputeTrending(); err != nil {
+		t.Fatal(err)
+	}
+	r, _ = app.FindRecordById("requests", r.Id)
+	if got := r.GetDateTime("updated"); got.String() != before.String() {
+		t.Errorf("updated %s → %s; the hourly recompute shouldn't bump it (it breaks the Recently updated sort)", before, got)
+	}
+}

@@ -18,6 +18,14 @@ func Register(app core.App, svc *requests.Service) {
 	app.OnRecordUpdateRequest("requests").BindFunc(rejectBanned)
 	app.OnRecordCreateRequest("comments").BindFunc(onCommentCreate)
 	app.OnRecordDeleteRequest("boards").BindFunc(onBoardDelete)
+	// Keep upvoteCount true when votes go away without ToggleVote, e.g. when a deleted
+	// account cascades into its votes. This runs inside the delete's transaction.
+	app.OnRecordDeleteExecute("votes").BindFunc(func(e *core.RecordEvent) error {
+		if err := e.Next(); err != nil {
+			return err
+		}
+		return svc.Recount(e.App, e.Record.GetString("request"))
+	})
 }
 
 // honeypot rejects requests whose hidden "website" field was filled in (bots fill every field).
@@ -88,10 +96,16 @@ func onRequestCreate(e *core.RecordRequestEvent, svc *requests.Service) error {
 		r.Set("visible", true)
 		r.Set("awaitingApproval", false)
 	}
-	if err := e.Next(); err != nil {
-		return err
-	}
-	return svc.AfterCreate(r, author)
+	// Save the request, its author's vote and its timeline entry in one transaction.
+	// PocketBase holds the response until the transaction commits, so the reply carries
+	// the real vote count and a failure leaves nothing behind.
+	return e.App.RunInTransaction(func(tx core.App) error {
+		e.App = tx
+		if err := e.Next(); err != nil {
+			return err
+		}
+		return svc.AfterCreate(tx, r, author)
+	})
 }
 
 func onCommentCreate(e *core.RecordRequestEvent) error {

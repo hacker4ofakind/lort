@@ -44,6 +44,14 @@ func Profile(app core.App, superuser *core.Record) (*core.Record, error) {
 		p.Set("name", NameFromEmail(email))
 	}
 	if p.IsNew() || !p.GetBool("isAdmin") {
+		// Anyone can sign up with an unverified email, so an existing unverified account
+		// may not belong to this admin. Revoke its password and sessions before it gains
+		// team rights; the admin reaches it through /api/lort/team/me from now on.
+		if !p.IsNew() && !p.Verified() {
+			p.SetRandomPassword()
+			p.RefreshTokenKey()
+			p.SetVerified(true)
+		}
 		p.Set("isAdmin", true)
 		if err := app.Save(p); err != nil {
 			return nil, err

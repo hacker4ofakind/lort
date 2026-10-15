@@ -128,6 +128,10 @@ func ensureTags(app core.App) error {
 // publicRequest is the filter for requests anyone may see: visible, on a public board, not merged.
 const publicRequest = "visible = true && board.isPublic = true && mergedInto = ''"
 
+// mine matches the signed-in user's own records. The auth check matters: deleting an account
+// empties its author fields, and an empty author would otherwise match an anonymous visitor.
+const mine = "(@request.auth.id != '' && author = @request.auth.id)"
+
 func ensureRequests(app core.App) error {
 	c := collection(app, Requests)
 	add(c,
@@ -146,17 +150,29 @@ func ensureRequests(app core.App) error {
 		&core.TextField{Name: "mergedInto", Max: 15},
 		&core.DateField{Name: "teamSeenAt"},
 	)
-	c.ListRule = types.Pointer(publicRequest + " || author = @request.auth.id")
-	c.ViewRule = types.Pointer(publicRequest + " || author = @request.auth.id || mergedInto != ''")
+	protectImages(c)
+	c.ListRule = types.Pointer(publicRequest + " || " + mine)
+	// Merged requests leave the list but keep their page (it shows "Merged into …"), as long
+	// as they were public; a hidden or private one stays hidden after a merge.
+	c.ViewRule = types.Pointer("(visible = true && board.isPublic = true) || " + mine)
 	// Creation goes through the record API so files work; the hooks package fills in
 	// author, status, visibility and counts and rejects banned users.
 	c.CreateRule = types.Pointer("@request.auth.id != '' && @request.auth.collectionName = 'users'")
 	// Authors may edit their own request while it is still pending; triage happens in /api/lort.
-	c.UpdateRule = types.Pointer("author = @request.auth.id && status = 'pending' && @request.body.status:isset = false && @request.body.visible:isset = false && @request.body.awaitingApproval:isset = false && @request.body.upvoteCount:isset = false && @request.body.trendScore:isset = false && @request.body.mergedInto:isset = false && @request.body.teamSeenAt:isset = false && @request.body.author:isset = false")
+	// Moving it to another board is the team's call (boards decide visibility and approval).
+	c.UpdateRule = types.Pointer(mine + " && status = 'pending' && @request.body.board:isset = false && @request.body.status:isset = false && @request.body.visible:isset = false && @request.body.awaitingApproval:isset = false && @request.body.upvoteCount:isset = false && @request.body.trendScore:isset = false && @request.body.mergedInto:isset = false && @request.body.teamSeenAt:isset = false && @request.body.author:isset = false")
 	c.DeleteRule = nil
 	c.AddIndex("idx_requests_board_status", false, "board, status", "")
 	c.AddIndex("idx_requests_trend", false, "trendScore", "")
 	return app.Save(c)
+}
+
+// protectImages makes downloads of a collection's images follow its ViewRule. Requests without
+// a file token are checked as anonymous, so public images keep working without one.
+func protectImages(c *core.Collection) {
+	if f, ok := c.Fields.GetByName("images").(*core.FileField); ok {
+		f.Protected = true
+	}
 }
 
 func ensureVotes(app core.App) error {
@@ -182,10 +198,11 @@ func ensureComments(app core.App) error {
 		&core.FileField{Name: "images", MaxSelect: 3, MaxSize: imageMax, MimeTypes: imageTypes},
 		&core.BoolField{Name: "internal"},
 	)
+	protectImages(c)
 	c.ListRule = types.Pointer("internal = false && request.visible = true && request.board.isPublic = true")
 	c.ViewRule = c.ListRule
 	c.CreateRule = types.Pointer("@request.auth.id != '' && @request.auth.collectionName = 'users'")
-	c.DeleteRule = types.Pointer("author = @request.auth.id")
+	c.DeleteRule = types.Pointer(mine)
 	return app.Save(c)
 }
 

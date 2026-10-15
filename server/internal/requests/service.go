@@ -2,12 +2,14 @@
 package requests
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/types"
 
 	"github.com/hacker4ofakind/lort/server/internal/status"
 	"github.com/hacker4ofakind/lort/server/internal/trending"
@@ -54,6 +56,9 @@ func (s *Service) ToggleVote(requestID, userID string) (voted bool, count int, e
 		if err != nil {
 			return err
 		}
+		if ok, err := canSee(tx, r, userID); err != nil || !ok {
+			return ErrNotFound
+		}
 		if st := status.Status(r.GetString("status")); st == status.Closed || r.GetString("mergedInto") != "" {
 			return ErrNotVoting
 		}
@@ -72,6 +77,26 @@ func (s *Service) ToggleVote(requestID, userID string) (voted bool, count int, e
 		return err
 	})
 	return voted, count, err
+}
+
+// canSee reports whether a user may see (and so vote on) a request: it is public,
+// it is theirs, or they are on the team.
+func canSee(app core.App, r *core.Record, userID string) (bool, error) {
+	u, err := app.FindRecordById("users", userID)
+	if err != nil {
+		return false, err
+	}
+	if u.GetBool("isAdmin") || r.GetString("author") == userID {
+		return true, nil
+	}
+	if !r.GetBool("visible") {
+		return false, nil
+	}
+	b, err := app.FindRecordById("boards", r.GetString("board"))
+	if err != nil {
+		return false, err
+	}
+	return b.GetBool("isPublic"), nil
 }
 
 func addVote(app core.App, userID, requestID string) error {
@@ -94,6 +119,33 @@ func (s *Service) recount(app core.App, r *core.Record) (int, error) {
 	r.Set("upvoteCount", n)
 	r.Set("trendScore", trending.Score(int(n), r.GetDateTime("created").Time(), s.Now()))
 	return int(n), app.Save(r)
+}
+
+// Recount refreshes a request's stored vote count and trend score from its votes.
+// It updates only those two columns, so it is safe inside other writes (the votes hook
+// calls it when a deleted account takes its votes with it). A missing request is skipped.
+func (s *Service) Recount(app core.App, requestID string) error {
+	var row struct {
+		Created string `db:"created"`
+		N       int    `db:"n"`
+	}
+	err := app.DB().NewQuery("SELECT created, (SELECT count(*) FROM votes WHERE request = {:id}) AS n FROM requests WHERE id = {:id}").
+		Bind(dbx.Params{"id": requestID}).One(&row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	created, err := types.ParseDateTime(row.Created)
+	if err != nil {
+		return err
+	}
+	_, err = app.DB().Update("requests", dbx.Params{
+		"upvoteCount": row.N,
+		"trendScore":  trending.Score(row.N, created.Time(), s.Now()),
+	}, dbx.HashExp{"id": requestID}).Execute()
+	return err
 }
 
 // SetStatus applies a triage action. actor is the team member's users profile.
@@ -199,31 +251,48 @@ func (s *Service) Merge(sourceID, targetID string, actor *core.Record) error {
 }
 
 // RecomputeTrending refreshes the trend score of every open request. Run hourly.
+// It writes only trendScore, and only while the vote count it read is still current, so it
+// never undoes a vote or a status change made meanwhile and leaves "updated" alone.
 func (s *Service) RecomputeTrending() error {
-	open, err := s.App.FindAllRecords("requests", dbx.NotIn("status", "completed", "closed"))
+	var rows []struct {
+		ID      string `db:"id"`
+		Created string `db:"created"`
+		Votes   int    `db:"upvoteCount"`
+	}
+	err := s.App.DB().Select("id", "created", "upvoteCount").From("requests").
+		Where(dbx.NotIn("status", "completed", "closed")).All(&rows)
 	if err != nil {
 		return err
 	}
-	for _, r := range open {
-		r.Set("trendScore", trending.Score(r.GetInt("upvoteCount"), r.GetDateTime("created").Time(), s.Now()))
-		if err := s.App.SaveNoValidate(r); err != nil {
-			return fmt.Errorf("trending %s: %w", r.Id, err)
+	for _, r := range rows {
+		created, err := types.ParseDateTime(r.Created)
+		if err != nil {
+			return fmt.Errorf("trending %s: %w", r.ID, err)
+		}
+		_, err = s.App.DB().Update("requests",
+			dbx.Params{"trendScore": trending.Score(r.Votes, created.Time(), s.Now())},
+			dbx.HashExp{"id": r.ID, "upvoteCount": r.Votes}).Execute()
+		if err != nil {
+			return fmt.Errorf("trending %s: %w", r.ID, err)
 		}
 	}
 	return nil
 }
 
 // MarkSeen records that the team has opened a request, which clears its "New" marker.
+// It reads the request inside the write transaction so it can't save over a concurrent change.
 func (s *Service) MarkSeen(requestID string) error {
-	r, err := s.find(s.App, requestID)
-	if err != nil {
-		return err
-	}
-	if !r.GetDateTime("teamSeenAt").IsZero() {
-		return nil
-	}
-	r.Set("teamSeenAt", s.Now())
-	return s.App.Save(r)
+	return s.App.RunInTransaction(func(tx core.App) error {
+		r, err := s.find(tx, requestID)
+		if err != nil {
+			return err
+		}
+		if !r.GetDateTime("teamSeenAt").IsZero() {
+			return nil
+		}
+		r.Set("teamSeenAt", s.Now())
+		return tx.Save(r)
+	})
 }
 
 func logActivity(app core.App, requestID string, actor *core.Record, kind, from, to string) error {
@@ -244,8 +313,9 @@ func logActivity(app core.App, requestID string, actor *core.Record, kind, from,
 }
 
 // AfterCreate gives a new request its author's vote, its trend score and its "posted this" entry.
-func (s *Service) AfterCreate(r, author *core.Record) error {
-	return s.App.RunInTransaction(func(tx core.App) error {
+// app is the transaction that created r, so a failure here undoes the request too.
+func (s *Service) AfterCreate(app core.App, r, author *core.Record) error {
+	return app.RunInTransaction(func(tx core.App) error {
 		if err := addVote(tx, author.Id, r.Id); err != nil {
 			return err
 		}

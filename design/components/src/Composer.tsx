@@ -21,7 +21,11 @@ export interface ComposerProps {
   allowImages?: boolean;
   /** Called while recording is toggled; the app streams audio to /api/transcribe. */
   onDictationChange?: (recording: boolean) => void;
-  onSubmit?: (value: ComposerSubmit) => void;
+  /**
+   * Called with the draft. Return a promise to keep the draft until it resolves: the field
+   * clears on success, and on rejection the draft stays and the error's message is shown.
+   */
+  onSubmit?: (value: ComposerSubmit) => void | Promise<void>;
   className?: string;
 }
 
@@ -44,6 +48,7 @@ export function Composer({
   const [previews, setPreviews] = React.useState<string[]>([]);
   const [error, setError] = React.useState('');
   const [recording, setRecording] = React.useState(false);
+  const [pending, setPending] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const fieldId = React.useId();
 
@@ -64,12 +69,21 @@ export function Composer({
     setImages([...images, ...ok.slice(0, room)]);
   };
 
-  const submit = () => {
-    if (!text.trim()) return;
-    onSubmit?.({ text: text.trim(), images, visibility });
-    setText('');
-    setImages([]);
+  const submit = async () => {
+    if (!text.trim() || pending) return;
+    setPending(true);
     setError('');
+    try {
+      await onSubmit?.({ text: text.trim(), images, visibility });
+      setText('');
+      setImages([]);
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message ? err.message : "That didn't send. Your text is still here, so try again.",
+      );
+    } finally {
+      setPending(false);
+    }
   };
 
   const internal = visibility === 'internal';
@@ -79,7 +93,7 @@ export function Composer({
       className={cx('lt-composer', internal && 'is-internal', className)}
       onSubmit={(e) => {
         e.preventDefault();
-        submit();
+        void submit();
       }}
     >
       <label htmlFor={fieldId} className="lt-sr">
@@ -112,7 +126,7 @@ export function Composer({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
-            submit();
+            void submit();
           }
         }}
       />
@@ -171,7 +185,15 @@ export function Composer({
             }}
           />
         )}
-        <Button variant="primary" type="submit" icon="arrowUp" iconOnly aria-label="Send" disabled={!text.trim()} />
+        <Button
+          variant="primary"
+          type="submit"
+          icon="arrowUp"
+          iconOnly
+          aria-label="Send"
+          aria-busy={pending}
+          disabled={!text.trim() || pending}
+        />
       </div>
     </form>
   );

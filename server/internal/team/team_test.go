@@ -86,3 +86,38 @@ func TestBanAndSummary(t *testing.T) {
 		t.Fatalf("reset link = %q, %v", link, err)
 	}
 }
+
+func TestInviteRevokesUnverifiedProfileCredentials(t *testing.T) {
+	app := testutil.NewApp(t)
+	squatter := testutil.User(t, app, "sofia@driftnote.app")
+	squatter.SetVerified(false)
+	if err := app.Save(squatter); err != nil {
+		t.Fatal(err)
+	}
+	oldToken := testutil.Token(t, squatter)
+	if _, err := team.Invite(app, "https://f.example", "sofia@driftnote.app"); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := app.FindAuthRecordByEmail("users", "sofia@driftnote.app")
+	if !p.GetBool("isAdmin") {
+		t.Fatal("invitee's profile should be promoted")
+	}
+	if _, err := app.FindAuthRecordByToken(oldToken, core.TokenTypeAuth); err == nil {
+		t.Error("the unverified account's old token still works after promotion")
+	}
+	if p.ValidatePassword("correcthorse") {
+		t.Error("the unverified account's password still works after promotion")
+	}
+}
+
+func TestInviteKeepsVerifiedProfileCredentials(t *testing.T) {
+	app := testutil.NewApp(t)
+	owner := testutil.User(t, app, "sofia@driftnote.app")
+	if _, err := team.Invite(app, "https://f.example", "sofia@driftnote.app"); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := app.FindAuthRecordByEmail("users", "sofia@driftnote.app")
+	if !p.ValidatePassword("correcthorse") || p.TokenKey() != owner.TokenKey() {
+		t.Error("a verified owner should keep their sign-in")
+	}
+}
