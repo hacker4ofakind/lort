@@ -104,9 +104,9 @@ Frontend rules: shadcn components are added with `pnpm dlx shadcn@latest add …
 | `users` (auth) | name, avatar, isAdmin, banned, verified, notify {shipped, changelog, replies}, unsubscribeToken | Name defaults to the part of the email before the @. Banned users can sign in and read but cannot post, vote or comment. |
 | `boards` | name, order, isPublic, requireApproval | The top board is the default for new suggestions. Private boards are visible to the team only. |
 | `tags` | name, order | Admin-managed. Users pick from them when suggesting. No colours (status colours are reserved). |
-| `requests` | board, author, title, body, images (≤3), tags, status, visible, awaitingApproval, upvoteCount, trendScore, mergedInto, teamSeenAt, created, updated | `visible=false` hides it from the public board. `teamSeenAt` null drives the "New" marker. |
-| `votes` | user, request | Unique (user, request). The author's vote is created with the request. |
-| `comments` | request, author, parent, body, images (≤3), internal | One level of replies: `parent` must be a top-level comment. Internal comments are team-only. |
+| `requests` | board, author, title, body, images (≤3), tags, status, visible, awaitingApproval, upvoteCount, trendScore, mergedInto, teamSeenAt, created, updated | `visible=false` hides it from the public board. `teamSeenAt` null drives the "New" marker. Images are protected files: they follow the request's view rule, so public ones load without a token and hidden ones need a PocketBase file token. |
+| `votes` | user, request | Unique (user, request). The author's vote is created with the request, in the same transaction. Deleting a vote by any route (including a deleted account's cascade) recounts its request in the same transaction. |
+| `comments` | request, author, parent, body, images (≤3), internal | One level of replies: `parent` must be a top-level comment. Internal comments are team-only. Images are protected like request images. |
 | `activity` | request, actor, kind (status_changed, merged_in, merged_from, board_changed, created), from, to | The request timeline. |
 | `changelogs` | title, slug, body (markdown), cover, labels (New/Improved/Fixed), requests, state (draft/scheduled/published), publishAt, publishedAt, lastEmailedAt, completeAttached | |
 | `settings` | single record: branding, roadmap, email, voice, turnstile, widget, backups, update check | Secret fields encrypted. |
@@ -118,6 +118,11 @@ Frontend rules: shadcn components are added with `pnpm dlx shadcn@latest add …
 Admins are PocketBase superusers. Each superuser is linked by email to a `users` record with `isAdmin=true`, which is what their public comments and votes are attached to (shown with a Team badge). Only superusers can sign in to `/dashboard`.
 
 Access rules: public collections are readable by anyone for public boards and visible requests. Requests and comments are created through PocketBase's record API (so image uploads work natively), guarded by API rules and Go hooks that force the author, status, visibility and counts and enforce bans, the honeypot, approval boards and one-level replies. Votes, triage, merges and team actions go through `/api/lort/*`. Admins act on the public board as their linked `users` profile: `GET /api/lort/team/me` gives the dashboard a token for it.
+
+Rule details that matter for security:
+- "Your own record" rules always check `@request.auth.id != ''` as well as the author, because deleting an account empties its `author` fields and an empty author would otherwise match an anonymous visitor.
+- Authors can edit the title, body, images and tags of their own request while it is Pending. They can't change its board: boards decide visibility and approval, so moving a request is a team action (the board chip on the dashboard, which writes a `board_changed` timeline entry).
+- A request, its author's vote and its "created" timeline entry are saved in one transaction, and the API reply waits for the commit, so it carries the real vote count.
 
 ## 4. Statuses, triage and merging
 
@@ -146,11 +151,11 @@ Pending → Reviewing → Planned → In progress → Completed, plus Closed out
 Merge opens a picker (search by title) for the target request. On confirm:
 - the source becomes Closed with `mergedInto` set and a timeline entry on both requests;
 - every upvoter of the source who has not voted on the target gets a vote on the target; `upvoteCount` is recomputed;
-- the source page shows "Merged into <target>" with a link; the source no longer appears on the board;
+- the source page shows "Merged into <target>" with a link (only if the source was public; a hidden or private request stays hidden after a merge); the source no longer appears on the board;
 - the `request.merged` webhook fires.
 
 ### 4.4 Trending
-`trendScore = upvoteCount / (ageHours + 2) ^ 1.5`, stored on the request. Recomputed on every vote change and by an hourly job for all open requests. Newest sorts by `created`.
+`trendScore = upvoteCount / (ageHours + 2) ^ 1.5`, stored on the request. Recomputed on every vote change and by an hourly job for all open requests. The hourly job writes only `trendScore`, skips a request whose vote count changed since it was read, and leaves `updated` alone so "Recently updated" stays meaningful. Newest sorts by `created`.
 
 ## 5. Public site
 
@@ -207,7 +212,7 @@ Opened from the floating bar, the phone "+", or the widget. It requires sign-in;
 - The author's vote is added automatically.
 
 ### 5.3 Votes
-One vote per user per request, toggled by the sticker. Signed-out visitors who click a sticker get the sign-in step and the vote is applied after. Optimistic UI with rollback on error. Votes on Closed or merged requests are not possible (sticker becomes static).
+One vote per user per request, toggled by the sticker. Signed-out visitors who click a sticker get the sign-in step and the vote is applied after. Optimistic UI with rollback on error. Votes on Closed or merged requests are not possible (sticker becomes static). People can only vote on requests they can see: public ones, their own, or any request for team members; anything else answers "not found".
 
 ### 5.4 Comments
 Signed-in, non-banned users can comment and reply (one level). Authors can delete their own comments; admins can delete any. Admin public comments email the request author and earlier commenters (category "Replies from the team"). Internal comments are visible to the team only and never trigger email or the public webhook payload.
@@ -278,7 +283,7 @@ One page with an in-page table of contents grouped as **Your board** (Branding, 
 - **Boards:** drag to reorder; per board Public and Needs approval switches; the top board is the default; add, rename, delete (only when empty, or move its requests to another board first).
 - **Tags:** add, rename, reorder, delete (removes it from requests).
 - **Roadmap:** "Show the roadmap publicly".
-- **Team:** admins with "You", invited date, Remove; "Invite an admin" creates a pending superuser and an invite link (emailed when email is on, otherwise shown to copy) valid 7 days.
+- **Team:** admins with "You", invited date, Remove; "Invite an admin" creates a pending superuser and an invite link (emailed when email is on, otherwise shown to copy) valid 7 days. If the invitee's email already has an unverified board account, its password and sessions are revoked when it becomes a team profile, because anyone can sign up with an unverified email.
 - **Email:** status card ("Connected through Resend · Sending as … · N verified subscribers"), Send a test email, Change (guided Resend or SMTP form). Turning email off disables every email feature and queues nothing.
 - **Voice dictation:**
   - Switch: "Let people dictate comments".
@@ -464,7 +469,7 @@ Port `design/components/src` into `web/components/lort` as client components and
 | FilterMenu | Multi-select drop-up/down with custom checkboxes and Clear at the bottom; summary text on the trigger. |
 | FloatingBar | Sort tabs, Board filter (hidden with one board), Status filter ("Open ideas"), primary "Suggest something". Compact phone version: sort tabs, one filter button (bottom sheet), round 48px "+". |
 | RequestCard | Sticker left; title, two-line excerpt, meta row (status icon + label, board pill, author avatar + name, comment count, "Waiting for approval" when relevant). |
-| Composer | Prompt-box field; up to 3 image thumbnails with remove; Public/Internal toggle for admins only (no chevron, flat in Public with a hover fill, borderless note-tint in Internal); mic only when voice is on; round primary send, disabled while empty. Cmd/Ctrl+Enter sends. In the Suggest modal it sits on surface-2 with border-strong so it stands off the modal. |
+| Composer | Prompt-box field; up to 3 image thumbnails with remove; Public/Internal toggle for admins only (no chevron, flat in Public with a hover fill, borderless note-tint in Internal); mic only when voice is on; round primary send, disabled while empty. Cmd/Ctrl+Enter sends. `onSubmit` may return a promise: while it is pending the draft is locked (field read-only, attach, remove, visibility and mic disabled, one send only); it clears on success and stays, with the error's message, on failure. In the Suggest modal it sits on surface-2 with border-strong so it stands off the modal. |
 | TriageBar | Status-driven actions (4.2); forward action is the one primary, last; inset-sm + float. |
 | InternalNote | note-bg, 2px dashed note-border, lock + "Only the team sees this". |
 | Avatar | Picture or initial on a warm fill picked from the name; keyline on public pages; primary ring for the team. |

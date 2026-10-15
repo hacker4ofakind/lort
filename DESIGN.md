@@ -295,7 +295,7 @@ React 18 + TypeScript source for each lives in `design/components/src/` (styles 
 - **SortTabs:** Trending / Newest with an ink indicator that slides (Motion `layoutId`); the selected label inverts.
 - **FloatingBar:** sort tabs, Board and Status drop-ups (open upward, Clear at the bottom, state in the URL), primary "Suggest something".
 - **RequestCard:** sticker left; title, two-line excerpt, meta row (status, board pill, author, comments).
-- **Composer:** prompt-box comment field for every signed-in user: images (≤3), a Public/Internal toggle for admins (no chevron; flat in Public with a hover fill; borderless in Internal with a note-tint hover and a small lock tip), mic only when voice is enabled, round send.
+- **Composer:** prompt-box comment field for every signed-in user: images (≤3), a Public/Internal toggle for admins (no chevron; flat in Public with a hover fill; borderless in Internal with a note-tint hover and a small lock tip), mic only when voice is enabled, round send. While a send is in flight the draft is locked (read-only field, other controls disabled); it clears only once the send succeeds and stays put, with the error shown, if it fails.
 - **TriageBar:** status-driven actions for the dashboard request page; forward action is the one primary button, last.
 - **InternalNote:** note-bg, 2px dashed note-border, "Only the team sees this".
 - **Avatar:** picture or initial on a warm fill picked from the name; keyline on public pages; primary ring for team members.

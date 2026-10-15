@@ -32,6 +32,16 @@
 - `setup.sh --reset-admin` will wrap PocketBase's built-in `lort superuser update <email> <password>` command; no custom CLI is needed.
 - Requests and comments are created through PocketBase's record API (`POST /api/collections/requests/records`), guarded by hooks, so multipart image uploads work without custom code. Votes, triage, merges and team actions go through `/api/lort`.
 
+## Changes after review (PR #1)
+
+Two review rounds changed the code after this plan was written. The code blocks below show the plan as it was first executed; the code in `server/` is the source of truth. What differs:
+
+- **Schema (Task 2):** owner-only rules use `mine = (@request.auth.id != '' && author = @request.auth.id)`, because a deleted account leaves `author` empty. The requests ViewRule is `(visible = true && board.isPublic = true) || mine`; the old `|| mergedInto != ''` exposed merged hidden requests. The UpdateRule also requires `@request.body.board:isset = false`. Request and comment `images` are protected files, set by `protectImages`, which also updates existing collections. The comments DeleteRule is `mine`.
+- **Service (Task 3):** `ToggleVote` returns `ErrNotFound` unless the voter can see the request (public, their own, or `isAdmin`). New `Recount(app, requestID)` updates only `upvoteCount` and `trendScore`. `RecomputeTrending` writes only `trendScore` with a targeted UPDATE that skips rows whose vote count changed, and no longer bumps `updated`. `MarkSeen` re-reads inside its transaction. `AfterCreate(app, r, author)` takes the transaction that created the request.
+- **Team (Task 5):** `Profile` revokes an existing unverified profile's password and sessions (`SetRandomPassword`, `RefreshTokenKey`) and marks it verified before promoting it.
+- **Hooks (Task 6):** request creation runs `e.Next()` and `AfterCreate` in one transaction, so PocketBase sends the response after the commit. A new `OnRecordDeleteExecute("votes")` hook runs the delete and `Recount` in one transaction that it opens itself, because PocketBase's own delete handler (priority 99) commits before returning.
+- **Tests:** new cases cover each of these, including anonymous access to authorless records, merged private requests, board moves, protected images, cascaded and failed recounts, atomic creation with and without an image, vote access, trending leaving `updated` alone, and invite credential revocation.
+
 ## File structure
 
 ```
@@ -766,7 +776,7 @@ Expected: `ok`. Both tests pass, which proves the rules parse, the schema is ide
 
 **Interfaces:**
 - Consumes: `status.*`, `trending.Score`, `schema.Ensure` (through testutil).
-- Produces: `requests.New(app core.App) *Service` with field `Now func() time.Time`; `(*Service).ToggleVote(requestID, userID string) (voted bool, count int, err error)`; `SetStatus(requestID string, a status.Action, actor *core.Record) (Change, error)`; `UndoComplete(requestID string) (Change, error)`; `Merge(sourceID, targetID string, actor *core.Record) error`; `RecomputeTrending() error`; `MarkSeen(requestID string) error`; `AfterCreate(r, author *core.Record) error`. `requests.Change{From, To status.Status; Roadmap string}` (JSON `from`, `to`, `roadmap`). Errors `ErrNotFound, ErrNotVoting, ErrUndoGone, ErrBadMerge`. Constant `UndoWindow = 60 * time.Second`.
+- Produces: `requests.New(app core.App) *Service` with field `Now func() time.Time`; `(*Service).ToggleVote(requestID, userID string) (voted bool, count int, err error)`; `SetStatus(requestID string, a status.Action, actor *core.Record) (Change, error)`; `UndoComplete(requestID string) (Change, error)`; `Merge(sourceID, targetID string, actor *core.Record) error`; `RecomputeTrending() error`; `MarkSeen(requestID string) error`; `AfterCreate(app core.App, r, author *core.Record) error` (app is the creating transaction; see "Changes after review"); `Recount(app core.App, requestID string) error`. `requests.Change{From, To status.Status; Roadmap string}` (JSON `from`, `to`, `roadmap`). Errors `ErrNotFound, ErrNotVoting, ErrUndoGone, ErrBadMerge`. Constant `UndoWindow = 60 * time.Second`.
 
 - [ ] **Step 1: Write the failing service tests**
 
