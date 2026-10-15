@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dashboard roadmap</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/lort/tokens.css">
+<link rel="stylesheet" href="ds/lort/components/bundle.css">
+<script src="ds/lort/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.rail-btn{all:unset;box-sizing:border-box;width:44px;height:44px;border-radius:999px;display:grid;place-items:center;color:var(--muted);cursor:pointer}
+.rail-btn.on{background:var(--surface-2);color:var(--ink)}
+.rail-btn:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+.col{border-radius:var(--radius-xl);padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--ground-sunken);min-height:760px;box-sizing:border-box;transition:background-color .15s ease-out}
+.col.is-target{background:var(--surface-2);box-shadow:inset 0 0 0 2px var(--primary-text)}
+.col-head{display:flex;align-items:center;gap:8px;padding:2px 2px 6px}
+.col-count{font-size:13px;font-weight:700;color:var(--muted);background:var(--surface-2);border-radius:999px;padding:1px 9px}
+.col.is-target .col-count{background:var(--surface-3)}
+.icon-btn{all:unset;box-sizing:border-box;width:32px;height:32px;border-radius:999px;display:grid;place-items:center;color:var(--muted);cursor:pointer}
+.icon-btn:hover{background:var(--surface-3);color:var(--ink)}
+.icon-btn:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+.rcard{display:flex;gap:12px;align-items:flex-start;padding:14px 14px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);cursor:grab;--lt-si-ground:var(--surface)}
+.rcard-title{font-family:var(--font-display);font-size:16px;line-height:21px;font-weight:700;letter-spacing:-0.01em}
+.rcard-meta{display:flex;align-items:center;gap:6px;margin-top:9px;flex-wrap:wrap}
+.pill{font-size:12px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border-radius:999px;padding:2px 9px}
+</style>
+</helmet>
+<div data-theme="dark" style="position: relative; height: 1040px; overflow: hidden; display: flex; background: var(--ground); color: var(--ink); font-family: var(--font-sans)">
+  <aside aria-label="Dashboard" style="width: 76px; flex: none; padding: 16px 0; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 6px; background: var(--ground-sunken); border-right: 1px solid var(--surface-2)">
+    <span style="width: 30px; height: 30px; border-radius: var(--radius-sm); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 15px; transform: rotate(var(--tilt-mark)); box-shadow: var(--shadow-sticker); margin-bottom: 14px">D</span>
+    <a class="rail-btn" href="#" aria-label="Requests"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM4 13h3l3 3h4l3-3h3"></path></svg></a>
+    <a class="rail-btn on" href="#" aria-label="Roadmap" aria-current="page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6M14 4h6M4 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM14 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"></path></svg></a>
+    <a class="rail-btn" href="#" aria-label="Changelog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 6h3a1 1 0 0 1 1 1v11a2 2 0 0 1-4 0V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a3 3 0 0 0 3 3h11M8 8h4M8 12h4M8 16h4"></path></svg></a>
+    <div style="flex: 1"></div>
+    <a class="rail-btn" href="#" aria-label="Docs"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13M12 6v13M21 6v13"></path></svg></a>
+    <a class="rail-btn" href="#" aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 6h8M16 6h4M6 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 12h2M10 12h10M15 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 18h11M19 18h1"></path></svg></a>
+    <button class="rail-btn" aria-label="Expand sidebar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 4v16M14 10l2 2l-2 2"></path></svg></button>
+  </aside>
+
+  <main style="flex: 1; min-width: 0; padding: 28px 36px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 22px">
+      <h1 style="margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 30px; letter-spacing: -0.025em">Roadmap</h1>
+      <span style="font-size: 14px; color: var(--muted); margin-top: 6px">Drag a card to change its status. Planned and later show on the public roadmap.</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 64px; gap: 16px; align-items: start">
+      <section class="col" aria-label="Planned">
+        <div class="col-head">
+          <x-import component-from-global-scope="Lort.StatusIcon" status="planned" keyline="{{true}}" show-label="{{true}}" size="{{20}}" class-name="title"></x-import>
+          <span class="col-count">4</span>
+          <span style="flex: 1"></span>
+          <button class="icon-btn" aria-label="Add a planned request"><x-import component-from-global-scope="Lort.Icon" name="plus" size="{{17}}"></x-import></button>
+          <button class="icon-btn" aria-label="Collapse Planned"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h4V5M15 5v4h4M5 15h4v4M15 19v-4h4"></path></svg></button>
+        </div>
+        <sc-for list="{{planned}}" as="c" hint-placeholder-count="3">
+          <div class="rcard" tabindex="0" aria-roledescription="draggable card">
+            <x-import component-from-global-scope="Lort.VoteSticker" count="{{c.votes}}" size="sm" read-only="{{true}}"></x-import>
+            <div style="flex: 1; min-width: 0">
+              <div class="rcard-title">{{c.title}}</div>
+              <div class="rcard-meta">
+                <span class="pill">{{c.board}}</span>
+                <sc-for list="{{c.tags}}" as="t" hint-placeholder-count="1"><span class="pill">{{t}}</span></sc-for>
+                <span style="flex: 1"></span>
+                <x-import component-from-global-scope="Lort.Avatar" name="{{c.who}}" size="{{22}}"></x-import>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+        <div aria-hidden="true" style="height: 84px; border-radius: var(--radius-lg); border: 2px dashed var(--dot-empty)"></div>
+      </section>
+
+      <section class="col is-target" aria-label="In progress, drop target">
+        <div class="col-head">
+          <x-import component-from-global-scope="Lort.StatusIcon" status="progress" keyline="{{true}}" show-label="{{true}}" size="{{20}}" class-name="title"></x-import>
+          <span class="col-count">2</span>
+          <span style="flex: 1"></span>
+          <button class="icon-btn" aria-label="Add an in-progress request"><x-import component-from-global-scope="Lort.Icon" name="plus" size="{{17}}"></x-import></button>
+          <button class="icon-btn" aria-label="Collapse In progress"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h4V5M15 5v4h4M5 15h4v4M15 19v-4h4"></path></svg></button>
+        </div>
+        <sc-for list="{{progress}}" as="c" hint-placeholder-count="2">
+          <div class="rcard" tabindex="0" aria-roledescription="draggable card">
+            <x-import component-from-global-scope="Lort.VoteSticker" count="{{c.votes}}" size="sm" read-only="{{true}}"></x-import>
+            <div style="flex: 1; min-width: 0">
+              <div class="rcard-title">{{c.title}}</div>
+              <div class="rcard-meta">
+                <span class="pill">{{c.board}}</span>
+                <sc-for list="{{c.tags}}" as="t" hint-placeholder-count="1"><span class="pill">{{t}}</span></sc-for>
+                <span style="flex: 1"></span>
+                <x-import component-from-global-scope="Lort.Avatar" name="{{c.who}}" size="{{22}}"></x-import>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+        <div style="margin-top: 4px; font-size: 13px; font-weight: 600; color: var(--primary-text); text-align: center; padding: 8px">Drop to start working on it</div>
+      </section>
+
+      <button aria-label="Completed, 6 in the last 30 days. Expand" style="all: unset; box-sizing: border-box; cursor: pointer; height: 760px; border-radius: var(--radius-xl); background: var(--ground-sunken); display: flex; flex-direction: column; align-items: center; padding: 16px 0; gap: 14px; --lt-si-ground: var(--ground-sunken)">
+        <x-import component-from-global-scope="Lort.StatusIcon" status="completed" keyline="{{true}}" size="{{20}}"></x-import>
+        <span style="writing-mode: vertical-rl; font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: -0.01em">Completed</span>
+        <span style="flex: 1"></span>
+        <span class="col-count">6</span>
+      </button>
+    </div>
+  </main>
+
+  <div aria-hidden="true" style="position: absolute; left: 640px; top: 300px; width: 470px; transform: rotate(2.5deg) scale(1.02); box-shadow: var(--shadow-card-float); border-radius: var(--radius-lg); pointer-events: none">
+    <div class="rcard" style="cursor: grabbing; border-color: var(--border-strong)">
+      <x-import component-from-global-scope="Lort.VoteSticker" count="{{48}}" size="sm" read-only="{{true}}" default-voted="{{true}}"></x-import>
+      <div style="flex: 1; min-width: 0">
+        <div class="rcard-title">Dark mode for the editor</div>
+        <div class="rcard-meta"><span class="pill">Features</span><span class="pill">ui</span><span class="pill">editor</span><span style="flex: 1"></span><x-import component-from-global-scope="Lort.Avatar" name="Mara K." size="{{22}}"></x-import></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position: absolute; right: 28px; bottom: 28px">
+    <x-import component-from-global-scope="Lort.Toast" action-label="Undo" countdown="{{60}}">Marked “Import from Day One” as completed · 17 people will be notified</x-import>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      planned: [
+        { title: 'Calendar heatmap of my writing streak', board: 'Features', tags: ['stats'], votes: 22, who: 'Ezra' },
+        { title: 'Passcode lock for the app', board: 'Features', tags: ['privacy'], votes: 19, who: 'Kenji' },
+        { title: 'Search inside images (OCR)', board: 'Features', tags: ['search'], votes: 9, who: 'Lina' }
+      ],
+      progress: [
+        { title: 'Export every entry as Markdown', board: 'Features', tags: ['export'], votes: 36, who: 'devon' },
+        { title: 'Sync drops my newest entry after a day offline', board: 'Bugs', tags: ['sync'], votes: 21, who: 'Priya S.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

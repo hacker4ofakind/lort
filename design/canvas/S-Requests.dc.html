@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Requests table loading</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/lort/tokens.css">
+<link rel="stylesheet" href="ds/lort/components/bundle.css">
+<script src="ds/lort/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.side-item{display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;border-radius:999px;font-size:15px;font-weight:600;color:var(--muted)}
+.side-item.on{background:var(--surface-2);color:var(--ink)}
+.sk{background:var(--surface-2);border-radius:999px;animation:sk-pulse 1.6s ease-in-out infinite}
+@keyframes sk-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){.sk{animation:none}}
+.rq-row{display:grid;grid-template-columns:28px minmax(0,1fr) 64px 200px 64px 30px;align-items:center;gap:14px;height:56px;padding:0 18px;border-top:1px solid var(--border)}
+.rq-head{height:40px;border-top:none;font-size:12px;font-weight:700;color:var(--muted)}
+</style>
+</helmet>
+<div data-theme="dark" aria-busy="true" style="height: 1040px; overflow: hidden; display: flex; background: var(--ground); color: var(--ink); font-family: var(--font-sans)">
+  <aside aria-label="Dashboard" style="width: 244px; flex: none; padding: 16px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; background: var(--ground-sunken); border-right: 1px solid var(--surface-2)">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px">
+      <span style="width: 30px; height: 30px; border-radius: var(--radius-sm); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 15px; transform: rotate(var(--tilt-mark)); box-shadow: var(--shadow-sticker)">D</span>
+      <span style="font-family: var(--font-display); font-weight: 800; font-size: 17px; flex: 1">Driftnote</span>
+    </div>
+    <a class="side-item on" href="#" aria-current="page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM4 13h3l3 3h4l3-3h3"></path></svg>Requests</a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6M14 4h6M4 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM14 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"></path></svg>Roadmap</a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 6h3a1 1 0 0 1 1 1v11a2 2 0 0 1-4 0V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a3 3 0 0 0 3 3h11M8 8h4M8 12h4M8 16h4"></path></svg>Changelog</a>
+    <div style="flex: 1"></div>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13M12 6v13M21 6v13"></path></svg>Docs</a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 6h8M16 6h4M6 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 12h2M10 12h10M15 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 18h11M19 18h1"></path></svg>Settings</a>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 12px 8px 2px">
+      <div class="sk" style="width: 28px; height: 28px"></div><div class="sk" style="width: 60px; height: 12px"></div>
+    </div>
+  </aside>
+  <main style="flex: 1; min-width: 0; padding: 30px 40px 60px; box-sizing: border-box">
+    <div style="max-width: 1060px; margin: 0 auto">
+      <div style="display: flex; align-items: center; gap: 12px">
+        <h1 style="margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 30px; letter-spacing: -0.025em">Requests</h1>
+        <div class="sk" style="width: 190px; height: 14px; margin-top: 6px"></div>
+        <span style="flex: 1"></span>
+        <div class="sk" style="width: 42px; height: 42px"></div>
+        <x-import component-from-global-scope="Lort.Button" variant="primary" icon="plus">New request</x-import>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; margin: 22px 0 16px">
+        <div class="sk" style="width: 280px; height: 42px"></div>
+        <div class="sk" style="width: 96px; height: 42px"></div>
+        <div class="sk" style="width: 112px; height: 42px"></div>
+        <div class="sk" style="width: 96px; height: 42px"></div>
+        <div class="sk" style="width: 150px; height: 42px"></div>
+        <span style="flex: 1"></span>
+        <div class="sk" style="width: 130px; height: 42px"></div>
+      </div>
+      <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden">
+        <div class="rq-row rq-head"><span></span><span>Request</span><span style="text-align: right">Votes</span><span>Tags</span><span>Date</span><span></span></div>
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="12">
+          <div class="rq-row">
+            <div class="sk" style="width: 18px; height: 18px"></div>
+            <div class="sk" style="width: {{r.w}}; height: 14px"></div>
+            <div class="sk" style="width: 34px; height: 14px; justify-self: end"></div>
+            <div style="display: flex; gap: 6px"><div class="sk" style="width: {{r.t1}}; height: 20px"></div><div class="sk" style="width: {{r.t2}}; height: 20px"></div></div>
+            <div class="sk" style="width: 44px; height: 12px"></div>
+            <div class="sk" style="width: 26px; height: 26px"></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var w = ['52%', '68%', '41%', '59%', '74%', '47%', '63%', '55%', '38%', '70%', '49%', '61%'];
+    return { rows: w.map(function (x, i) { return { w: x, t1: (i % 3 === 0 ? 64 : 48) + 'px', t2: (i % 2 === 0 ? 0 : 56) + 'px' }; }) };
+  }
+}
+</script>
+</body>
+</html>

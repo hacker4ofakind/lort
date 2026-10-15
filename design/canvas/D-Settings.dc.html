@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dashboard settings</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/lort/tokens.css">
+<link rel="stylesheet" href="ds/lort/components/bundle.css">
+<script src="ds/lort/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Figtree:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.side-item{display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;border-radius:999px;font-size:15px;font-weight:600;color:var(--muted)}
+.side-item.on{background:var(--surface-2);color:var(--ink)}
+.toc a{display:block;padding:6px 12px;border-radius:999px;font-size:14px;font-weight:600;color:var(--muted)}
+.toc a.on{background:var(--surface-2);color:var(--ink)}
+.toc .grp{font-size:12px;font-weight:700;color:var(--muted);padding:14px 12px 4px}
+.sec{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px 24px;scroll-margin-top:24px}
+.sec h2{margin:0;font-family:var(--font-display);font-size:20px;line-height:25px;font-weight:700;letter-spacing:-0.01em}
+.sec .lede{margin:4px 0 18px;font-size:14px;color:var(--muted);max-width:62ch}
+.row{display:flex;align-items:center;gap:16px;padding:14px 0;border-top:1px solid var(--border)}
+.row:first-of-type{border-top:none}
+.row-main{flex:1;min-width:0}
+.row-main b{display:block;font-size:15px;font-weight:600}
+.row-main span{display:block;font-size:13px;color:var(--muted);margin-top:2px}
+.field{all:unset;box-sizing:border-box;height:40px;padding:0 14px;border-radius:999px;background:var(--ground);border:1px solid var(--border);font-size:14px;color:var(--ink)}
+.field:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+.sw{all:unset;cursor:pointer;display:inline-flex;border-radius:999px}
+.sw:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+.swatch{all:unset;cursor:pointer;width:30px;height:30px;border-radius:50%;box-sizing:border-box}
+.swatch[aria-checked="true"]{box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--ink)}
+.swatch:focus-visible{outline:3px solid var(--focus);outline-offset:4px}
+.code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;line-height:20px;background:var(--ground);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 16px;color:var(--ink-2);white-space:pre-wrap;word-break:break-all;box-shadow:var(--shadow-inset-sm)}
+.tab{all:unset;cursor:pointer;height:32px;padding:0 13px;border-radius:999px;font-size:13px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--ground)}
+.grip{color:var(--muted);cursor:grab;display:grid;place-items:center}
+.badge{font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;background:var(--surface-2);color:var(--ink-2)}
+.tbl-row{display:grid;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--border);font-size:14px}
+.ok{color:var(--status-completed-text)}
+.bad{color:var(--danger-text)}
+</style>
+</helmet>
+<div data-theme="dark" style="min-height: 3600px; display: flex; background: var(--ground); color: var(--ink); font-family: var(--font-sans)">
+  <aside aria-label="Dashboard" style="width: 244px; flex: none; padding: 16px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; background: var(--ground-sunken); border-right: 1px solid var(--surface-2)">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px">
+      <span style="width: 30px; height: 30px; border-radius: var(--radius-sm); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 15px; transform: rotate(var(--tilt-mark)); box-shadow: var(--shadow-sticker)">D</span>
+      <span style="font-family: var(--font-display); font-weight: 800; font-size: 17px; flex: 1">Driftnote</span>
+      <button aria-label="Collapse sidebar" style="all: unset; cursor: pointer; width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; color: var(--muted)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 4v16M15 10l-2 2l2 2"></path></svg></button>
+    </div>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM4 13h3l3 3h4l3-3h3"></path></svg>Requests</a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6M14 4h6M4 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM14 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"></path></svg>Roadmap</a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 6h3a1 1 0 0 1 1 1v11a2 2 0 0 1-4 0V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a3 3 0 0 0 3 3h11M8 8h4M8 12h4M8 16h4"></path></svg>Changelog</a>
+    <div style="flex: 1"></div>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13M12 6v13M21 6v13"></path></svg>Docs</a>
+    <a class="side-item on" href="#" aria-current="page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 6h8M16 6h4M6 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 12h2M10 12h10M15 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 18h11M19 18h1"></path></svg>Settings</a>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 12px 8px 2px">
+      <x-import component-from-global-scope="Lort.Avatar" name="Luk" size="{{28}}" team="{{true}}"></x-import>
+      <span style="font-size: 13px; font-weight: 600; flex: 1">Luk</span>
+      <span style="font-size: 11px; color: var(--muted)">Lort 1.0</span>
+    </div>
+  </aside>
+
+  <main style="flex: 1; min-width: 0; padding: 30px 40px 80px; box-sizing: border-box">
+    <div style="max-width: 1040px; margin: 0 auto; display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 32px; align-items: start">
+      <nav class="toc" aria-label="Settings sections" style="position: sticky; top: 24px">
+        <h1 style="margin: 0 0 14px 12px; font-family: var(--font-display); font-weight: 800; font-size: 30px; letter-spacing: -0.025em">Settings</h1>
+        <div class="grp">Your board</div>
+        <a href="#branding" class="on">Branding</a><a href="#boards">Boards</a><a href="#tags">Tags</a><a href="#roadmap">Roadmap</a><a href="#team">Team</a>
+        <div class="grp">Services</div>
+        <a href="#email">Email</a><a href="#voice">Voice dictation</a><a href="#spam">Spam protection</a>
+        <div class="grp">Connect</div>
+        <a href="#widget">Widget</a><a href="#mcp">MCP server</a><a href="#webhooks">Webhooks</a>
+        <div class="grp">Server</div>
+        <a href="#backups">Backups</a><a href="#updates">Updates</a>
+      </nav>
+
+      <div style="display: flex; flex-direction: column; gap: 20px">
+        <section class="sec" id="branding">
+          <h2>Branding</h2>
+          <p class="lede">How your board looks to your users. Lort stays in the background.</p>
+          <div class="row">
+            <span style="width: 56px; height: 56px; border-radius: 14px; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 26px; transform: rotate(var(--tilt-mark)); box-shadow: var(--shadow-sticker)">D</span>
+            <div class="row-main"><b>App logo</b><span>Square PNG, SVG or WebP, at least 128 px.</span></div>
+            <x-import component-from-global-scope="Lort.Button" variant="secondary" size="sm">Replace</x-import>
+          </div>
+          <div class="row">
+            <div class="row-main"><b>App name</b><span>Shown in the top bar, emails and the browser tab.</span></div>
+            <input class="field" aria-label="App name" value="Driftnote" style="width: 260px">
+          </div>
+          <div class="row" style="align-items: flex-start">
+            <div class="row-main"><b>Primary colour</b><span>Buttons, voted stickers and everything that’s on. Lort adjusts custom colours so text on them stays readable in light and dark.</span></div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 12px">
+              <div role="radiogroup" aria-label="Primary colour presets" style="display: flex; gap: 10px">
+                <sc-for list="{{swatches}}" as="s" hint-placeholder-count="8"><button class="swatch" role="radio" aria-checked="{{s.on}}" aria-label="{{s.name}}" style="background: {{s.hex}}"></button></sc-for>
+              </div>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted)">Custom<input class="field" aria-label="Custom hex colour" value="#cc3a6d" style="width: 120px; font-family: 'JetBrains Mono', monospace; font-size: 13px"></label>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-main"><b>Show “Get your own board” card</b><span>A small card on public pages that links to Lort’s landing page. “Powered by Lort” in the footer stays either way.</span></div>
+            <button class="sw" role="switch" aria-checked="true" aria-label="Show Get your own board card"><span class="lt-switch is-on"></span></button>
+          </div>
+        </section>
+
+        <section class="sec" id="boards">
+          <h2>Boards</h2>
+          <p class="lede">Drag to reorder. The top board is the default for new suggestions. Private boards are only visible to your team.</p>
+          <div style="display: grid; grid-template-columns: 24px minmax(0, 1fr) 110px 150px 36px; gap: 12px; align-items: center; font-size: 12px; font-weight: 700; color: var(--muted); padding: 0 0 6px">
+            <span></span><span>Board</span><span>Public</span><span>Needs approval</span><span></span>
+          </div>
+          <sc-for list="{{boards}}" as="b" hint-placeholder-count="3">
+            <div style="display: grid; grid-template-columns: 24px minmax(0, 1fr) 110px 150px 36px; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border)">
+              <span class="grip" aria-label="Drag {{b.name}}" role="button" tabindex="0"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg></span>
+              <span style="display: flex; align-items: center; gap: 8px; font-weight: 600">{{b.name}}<sc-if value="{{b.def}}" hint-placeholder-val="{{false}}"><span class="badge">Default</span></sc-if></span>
+              <button class="sw" role="switch" aria-checked="{{b.pub}}" aria-label="{{b.name}} is public"><span class="lt-switch {{b.pubCls}}"></span></button>
+              <button class="sw" role="switch" aria-checked="{{b.appr}}" aria-label="{{b.name}} needs approval"><span class="lt-switch {{b.apprCls}}"></span></button>
+              <x-import component-from-global-scope="Lort.Button" variant="ghost" size="sm" icon="x" icon-only="{{true}}" aria-label="Delete {{b.name}}"></x-import>
+            </div>
+          </sc-for>
+          <div style="padding-top: 12px; border-top: 1px solid var(--border)"><x-import component-from-global-scope="Lort.Button" variant="secondary" size="sm" icon="plus">Add board</x-import></div>
+        </section>
+
+        <section class="sec" id="tags">
+          <h2>Tags</h2>
+          <p class="lede">Labels you can put on requests. People can pick from these when they suggest something.</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <sc-for list="{{tags}}" as="t" hint-placeholder-count="9"><x-import component-from-global-scope="Lort.Chip" kind="tag" label="{{t}}"></x-import></sc-for>
+            <x-import component-from-global-scope="Lort.Chip" kind="add" label="Add a tag"></x-import>
+          </div>
+        </section>
+
+        <section class="sec" id="roadmap">
+          <h2>Roadmap</h2>
+          <div class="row" style="padding-top: 6px">
+            <div class="row-main"><b>Show the roadmap publicly</b><span>Adds Roadmap to your board’s navigation. Planned, In progress and the last 30 days of Completed.</span></div>
+            <button class="sw" role="switch" aria-checked="true" aria-label="Show the roadmap publicly"><span class="lt-switch is-on"></span></button>
+          </div>
+        </section>
+
+        <section class="sec" id="team">
+          <h2>Team</h2>
+          <p class="lede">Admins can sign in to this dashboard. Their comments show a Team badge.</p>
+          <div class="row">
+            <x-import component-from-global-scope="Lort.Avatar" name="Luk" size="{{34}}" team="{{true}}"></x-import>
+            <div class="row-main"><b>Luk <span class="badge" style="display: inline; margin-left: 6px">You</span></b><span>luk@driftnote.app · set up Lort</span></div>
+          </div>
+          <div class="row">
+            <x-import component-from-global-scope="Lort.Avatar" name="Sofia" size="{{34}}" team="{{true}}"></x-import>
+            <div class="row-main"><b>Sofia</b><span>sofia@driftnote.app · invited 2 Oct</span></div>
+            <x-import component-from-global-scope="Lort.Button" variant="danger" size="sm">Remove</x-import>
+          </div>
+          <div style="padding-top: 12px; border-top: 1px solid var(--border)"><x-import component-from-global-scope="Lort.Button" variant="secondary" size="sm" icon="plus">Invite an admin</x-import></div>
+        </section>
+
+        <section class="sec" id="email">
+          <h2>Email</h2>
+          <p class="lede">Verification, password resets, “it shipped” emails, changelog emails and replies from your team.</p>
+          <div class="row">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--status-completed)"></span>
+            <div class="row-main"><b>Connected through Resend</b><span>Sending as updates@feedback.driftnote.app · 412 verified subscribers</span></div>
+            <x-import component-from-global-scope="Lort.Button" variant="secondary" size="sm">Send a test email</x-import>
+            <x-import component-from-global-scope="Lort.Button" variant="ghost" size="sm">Change</x-import>
+          </div>
+        </section>
+
+        <section class="sec" id="voice">
+          <h2>Voice dictation</h2>
+          <div class="row" style="padding-top: 6px">
+            <div class="row-main"><b>Let people dictate comments</b><span>Runs Whisper large-v3-turbo on this server. The model is downloaded (547 MB) and uses about 1 GB of memory while transcribing.</span></div>
+            <button class="sw" role="switch" aria-checked="true" aria-label="Voice dictation"><span class="lt-switch is-on"></span></button>
+          </div>
+        </section>
+
+        <section class="sec" id="spam">
+          <h2>Spam protection</h2>
+          <p class="lede">Rate limits and a hidden honeypot field are always on. Cloudflare Turnstile adds an invisible check at sign-up.</p>
+          <div class="row">
+            <div class="row-main"><b>Cloudflare Turnstile</b><span>Free. Paste the site key and secret from your Cloudflare dashboard.</span></div>
+            <button class="sw" role="switch" aria-checked="false" aria-label="Cloudflare Turnstile"><span class="lt-switch"></span></button>
+          </div>
+        </section>
+
+        <section class="sec" id="widget">
+          <h2>Widget</h2>
+          <p class="lede">Add a Feedback button to your own app. It opens the Suggest something form without leaving your site.</p>
+          <div class="code">&lt;script src="https://feedback.driftnote.app/widget.js" async&gt;&lt;/script&gt;</div>
+          <div style="display: flex; gap: 8px; margin-top: 12px"><x-import component-from-global-scope="Lort.Button" variant="secondary" size="sm">Copy snippet</x-import><x-import component-from-global-scope="Lort.Button" variant="ghost" size="sm">Preview the widget</x-import></div>
+        </section>
+
+        <section class="sec" id="mcp">
+          <h2>MCP server</h2>
+          <p class="lede">Let your coding agent run the board: triage, change statuses, publish changelogs, edit settings. Keys can’t manage admins, create keys or restore backups.</p>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 110px 150px 70px; gap: 12px; font-size: 12px; font-weight: 700; color: var(--muted); padding-bottom: 6px">
+            <span>Key</span><span>Access</span><span>Last used</span><span></span>
+          </div>
+          <div class="tbl-row" style="grid-template-columns: minmax(0, 1fr) 110px 150px 70px"><span><b>Claude Code on my laptop</b> <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted)">lort_7f3a…</span></span><span class="badge" style="justify-self: start; background: var(--primary-soft); color: var(--primary-text)">Full</span><span style="color: var(--muted)">12 min ago</span><x-import component-from-global-scope="Lort.Button" variant="danger" size="sm">Revoke</x-import></div>
+          <div class="tbl-row" style="grid-template-columns: minmax(0, 1fr) 110px 150px 70px"><span><b>Weekly digest bot</b> <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted)">lort_c21e…</span></span><span class="badge" style="justify-self: start">Read-only</span><span style="color: var(--muted)">3 days ago</span><x-import component-from-global-scope="Lort.Button" variant="danger" size="sm">Revoke</x-import></div>
+          <div style="padding: 12px 0 18px; border-top: 1px solid var(--border)"><x-import component-from-global-scope="Lort.Button" variant="secondary" size="sm" icon="plus">Create a key</x-import></div>
+          <div role="tablist" aria-label="Install in" style="display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--ground); border: 1px solid var(--border); box-shadow: var(--shadow-inset-sm); margin-bottom: 12px">
+            <button class="tab" role="tab" aria-selected="true">Claude Code</button><button class="tab" role="tab" aria-selected="false">Codex</button><button class="tab" role="tab" aria-selected="false">Cursor</button><button class="tab" role="tab" aria-selected="false">VS Code</button><button class="tab" role="tab" aria-selected="false">Gemini CLI</button>
+          </div>
+          <div class="code">claude mcp add --transport http lort https://feedback.driftnote.app/mcp \
+  --header "Authorization: Bearer lort_7f3a••••••••••••"</div>
+          <div style="display: flex; gap: 8px; margin-top: 12px"><x-import component-from-global-scope="Lort.Button" variant="secondary" size="sm">Copy command</x-import><span style="font-size: 13px; color: var(--muted); align-self: center">The full key is only shown when you create it.</span></div>
+        </section>
+
+        <section class="sec" id="webhooks">
+          <h2>Webhooks</h2>
+          <p class="lede">Lort POSTs signed JSON when things happen. Discord and Slack links get a formatted message instead.</p>
+          <div class="tbl-row" style="grid-template-columns: minmax(0, 1fr) 220px 170px; border-top: none">
+            <span><b style="display: flex; align-items: center; gap: 8px">discord.com/api/webhooks/1294…<span class="badge">Discord</span></b><span style="font-size: 13px; color: var(--muted)">request.created, request.status_changed</span></span>
+            <span style="font-size: 13px; color: var(--muted)">2 events</span>
+            <span class="ok" style="font-size: 13px; font-weight: 600">Delivered · 3 min ago</span>
+          </div>
+          <div class="tbl-row" style="grid-template-columns: minmax(0, 1fr) 220px 170px">
+            <span><b style="display: block">n8n.driftnote.app/webhook/lort</b><span style="font-size: 13px; color: var(--muted)">request.upvote_threshold at 25 votes, changelog.published</span></span>
+            <span style="font-size: 13px; color: var(--muted)">2 events</span>
+            <span class="bad" style="font-size: 13px; font-weight: 600">Failed (500) · retrying in 5 min</span>
+          </div>
+          <div style="padding-top: 12px; border-top: 1px solid var(--border)"><x-import component-from-global-scope="Lort.Button" variant="secondary" size="sm" icon="plus">Add a webhook</x-import></div>
+        </section>
+
+        <section class="sec" id="backups">
+          <h2>Backups</h2>
+          <p class="lede">Every night Lort zips the database and uploads and keeps the last 7 on this server.</p>
+          <div class="row">
+            <div class="row-main"><b>Last backup: today at 03:00</b><span>18.4 MB · next one tonight at 03:00</span></div>
+            <x-import component-from-global-scope="Lort.Button" variant="secondary" size="sm">Back up now</x-import>
+            <x-import component-from-global-scope="Lort.Button" variant="ghost" size="sm">Download</x-import>
+          </div>
+          <div class="row">
+            <div class="row-main"><b>Also copy to S3-compatible storage</b><span>Cloudflare R2, Backblaze B2, AWS S3 or anything that speaks S3.</span></div>
+            <button class="sw" role="switch" aria-checked="false" aria-label="Copy backups to S3"><span class="lt-switch"></span></button>
+          </div>
+          <div class="row">
+            <div class="row-main"><b>Restore from a backup</b><span>Replaces everything on this board with the backup’s contents.</span></div>
+            <x-import component-from-global-scope="Lort.Button" variant="danger" size="sm">Restore…</x-import>
+          </div>
+        </section>
+
+        <section class="sec" id="updates">
+          <h2>Updates</h2>
+          <div class="row" style="padding-top: 6px">
+            <div class="row-main"><b>Lort 1.0.0 · up to date</b><span>To update, run <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--surface-2); padding: 1px 6px; border-radius: 6px; color: var(--ink)">./setup.sh --update</code> on the server. It backs up first.</span></div>
+            <button class="sw" role="switch" aria-checked="true" aria-label="Check for updates daily"><span class="lt-switch is-on"></span></button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var sw = [['Pink', '#cc3a6d'], ['Coral', '#d4553a'], ['Amber', '#b7791f'], ['Leaf', '#2f855a'], ['Teal', '#0f8a8a'], ['Ocean', '#2563eb'], ['Grape', '#7c4dcc'], ['Graphite', '#4b5563']];
+    function B(name, def, pub, appr) { return { name: name, def: def, pub: pub, appr: appr, pubCls: pub ? 'is-on' : '', apprCls: appr ? 'is-on' : '' }; }
+    return {
+      swatches: sw.map(function (s, i) { return { name: s[0], hex: s[1], on: i === 0 }; }),
+      boards: [B('Features', true, true, false), B('Bugs', false, true, true), B('Internal', false, false, false)],
+      tags: ['editor', 'ui', 'ios', 'android', 'sync', 'privacy', 'export', 'import', 'stats']
+    };
+  }
+}
+</script>
+</body>
+</html>

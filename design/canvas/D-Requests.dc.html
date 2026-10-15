@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dashboard requests table</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/lort/tokens.css">
+<link rel="stylesheet" href="ds/lort/components/bundle.css">
+<script src="ds/lort/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.side-item{display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;border-radius:999px;font-size:15px;font-weight:600;color:var(--muted)}
+.side-item.on{background:var(--surface-2);color:var(--ink)}
+.rq-row{display:grid;grid-template-columns:28px minmax(0,1fr) 64px 200px 64px 30px;align-items:center;gap:14px;height:56px;padding:0 18px;border-top:1px solid var(--border);--lt-si-ground:var(--surface)}
+.rq-row:hover{background:var(--surface-2);--lt-si-ground:var(--surface-2)}
+.rq-row.is-new{background:var(--primary-soft);--lt-si-ground:var(--primary-soft)}
+.rq-head{height:40px;border-top:none;font-size:12px;font-weight:700;color:var(--muted)}
+.rq-head:hover{background:none}
+.rq-title{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rq-tag{font-size:12px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border-radius:999px;padding:2px 9px;white-space:nowrap}
+.rq-row:hover .rq-tag{background:var(--surface-3)}
+.rq-num{display:flex;align-items:center;justify-content:flex-end;gap:4px;font-variant-numeric:tabular-nums;font-weight:700;font-size:14px}
+.rq-badge{font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;margin-left:8px;white-space:nowrap}
+</style>
+</helmet>
+<div data-theme="dark" style="min-height: 1100px; display: flex; flex-wrap: wrap; background: var(--ground); color: var(--ink); font-family: var(--font-sans)">
+  <aside aria-label="Dashboard" style="flex: 1 1 244px; max-width: 244px; min-width: 200px; padding: 16px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; background: var(--ground-sunken); border-right: 1px solid var(--surface-2)">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px">
+      <span style="width: 30px; height: 30px; border-radius: var(--radius-sm); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 15px; transform: rotate(var(--tilt-mark)); box-shadow: var(--shadow-sticker)">D</span>
+      <span style="font-family: var(--font-display); font-weight: 800; font-size: 17px; flex: 1">Driftnote</span>
+      <button aria-label="Collapse sidebar" style="all: unset; cursor: pointer; width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; color: var(--muted)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 4v16M15 10l-2 2l2 2"></path></svg></button>
+    </div>
+    <a class="side-item on" href="#" aria-current="page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM4 13h3l3 3h4l3-3h3"></path></svg>Requests<span style="margin-left: auto; font-size: 12px; font-weight: 700; background: var(--primary); color: var(--on-primary); border-radius: 999px; padding: 1px 8px">3 new</span></a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6M14 4h6M4 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM14 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"></path></svg>Roadmap</a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 6h3a1 1 0 0 1 1 1v11a2 2 0 0 1-4 0V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a3 3 0 0 0 3 3h11M8 8h4M8 12h4M8 16h4"></path></svg>Changelog</a>
+    <div style="flex: 1"></div>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13M12 6v13M21 6v13"></path></svg>Docs</a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 6h8M16 6h4M6 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 12h2M10 12h10M15 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 18h11M19 18h1"></path></svg>Settings</a>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 12px 8px 2px">
+      <x-import component-from-global-scope="Lort.Avatar" name="Luk" size="{{28}}" team="{{true}}"></x-import>
+      <span style="font-size: 13px; font-weight: 600; flex: 1">Luk</span>
+      <span style="font-size: 11px; color: var(--muted)">Lort 1.0</span>
+    </div>
+  </aside>
+
+  <main style="flex: 999 1 640px; min-width: 0; padding: 30px 40px 60px; box-sizing: border-box">
+    <div style="max-width: 1060px; margin: 0 auto">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <h1 style="margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 30px; letter-spacing: -0.025em">Requests</h1>
+        <span style="font-size: 14px; color: var(--muted); margin-top: 6px">142 total · 38 waiting for you</span>
+        <span style="flex: 1"></span>
+        <span style="font-size: 13px; color: var(--muted)">Live</span>
+        <x-import component-from-global-scope="Lort.Button" variant="ghost" icon="rotate" icon-only="{{true}}" aria-label="Refresh"></x-import>
+        <x-import component-from-global-scope="Lort.Button" variant="primary" icon="plus">New request</x-import>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px; margin: 22px 0 16px; flex-wrap: wrap">
+        <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 16px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 280px; box-sizing: border-box">
+          <x-import component-from-global-scope="Lort.Icon" name="search" size="{{16}}"></x-import>
+          <input type="search" placeholder="Search titles and details" aria-label="Search requests" style="all: unset; flex: 1; font-size: 14px; color: var(--ink)">
+        </label>
+        <x-import component-from-global-scope="Lort.FilterMenu" all-label="Every status" noun="statuses" options="{{statusOptions}}" default-selected="{{openStatuses}}" placement="down" summarize="{{openSummary}}"></x-import>
+        <x-import component-from-global-scope="Lort.FilterMenu" all-label="All boards" noun="boards" options="{{boardOptions}}" placement="down"></x-import>
+        <x-import component-from-global-scope="Lort.FilterMenu" all-label="Any tag" noun="tags" options="{{tagOptions}}" placement="down"></x-import>
+        <x-import component-from-global-scope="Lort.FilterMenu" all-label="Public and hidden" noun="kinds" options="{{visOptions}}" placement="down"></x-import>
+        <span style="flex: 1"></span>
+        <x-import component-from-global-scope="Lort.Button" variant="secondary" trailing-icon="chevronDown">Newest first</x-import>
+      </div>
+
+      <div role="table" aria-label="Requests" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden">
+        <div role="row" class="rq-row rq-head">
+          <span role="columnheader"><span style="position: absolute; left: -9999px">Status</span></span>
+          <span role="columnheader">Request</span>
+          <span role="columnheader" style="text-align: right">Votes</span>
+          <span role="columnheader">Tags</span>
+          <span role="columnheader">Date</span>
+          <span role="columnheader"><span style="position: absolute; left: -9999px">Requested by</span></span>
+        </div>
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="12">
+          <a role="row" href="#" class="rq-row {{r.cls}}">
+            <span role="cell"><x-import component-from-global-scope="Lort.StatusIcon" status="{{r.status}}" size="{{18}}"></x-import></span>
+            <span role="cell" style="display: flex; align-items: center; min-width: 0">
+              <span class="rq-title">{{r.title}}</span>
+              <sc-if value="{{r.isNew}}" hint-placeholder-val="{{false}}"><span class="rq-badge" style="background: var(--primary); color: var(--on-primary)">New</span></sc-if>
+              <sc-if value="{{r.hidden}}" hint-placeholder-val="{{false}}"><span class="rq-badge" style="background: var(--surface-3); color: var(--ink-2)">Hidden</span></sc-if>
+            </span>
+            <span role="cell" class="rq-num"><x-import component-from-global-scope="Lort.Icon" name="arrowUp" size="{{14}}" stroke-width="{{2.6}}"></x-import>{{r.votes}}</span>
+            <span role="cell" style="display: flex; gap: 6px; overflow: hidden">
+              <sc-for list="{{r.tags}}" as="t" hint-placeholder-count="1"><span class="rq-tag">{{t}}</span></sc-for>
+            </span>
+            <span role="cell" style="font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums">{{r.date}}</span>
+            <span role="cell"><x-import component-from-global-scope="Lort.Avatar" name="{{r.who}}" size="{{26}}"></x-import></span>
+          </a>
+        </sc-for>
+      </div>
+      <p style="margin: 14px 4px 0; font-size: 13px; color: var(--muted)">Showing 12 of 104 open requests. Scroll for more.</p>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var L = window.Lort || { STATUS_ORDER: [], STATUS: {} };
+    var open = ['pending', 'reviewing', 'planned', 'progress'];
+    var raw = [
+      ['pending', 'Weekly email with my writing streak', 7, ['email'], '14 Oct', 'sam_w', 'new'],
+      ['pending', 'Crash when pasting a long screenshot', 3, ['editor'], '14 Oct', 'Tomás', 'new hidden'],
+      ['pending', 'Lock the app with Face ID', 1, ['privacy', 'ios'], '14 Oct', 'Ana', 'new'],
+      ['pending', 'Home-screen widget with today’s prompt', 14, ['ios', 'android'], '13 Oct', 'jonas', ''],
+      ['reviewing', 'Sync drops my newest entry after a day offline', 21, ['android', 'sync'], '11 Oct', 'Priya S.', ''],
+      ['reviewing', 'Markdown tables in the editor', 11, ['editor'], '09 Oct', 'Rui', ''],
+      ['progress', 'Import from Day One', 17, ['import'], '18 Sep', 'Fern', ''],
+      ['progress', 'Export every entry as Markdown', 36, ['export'], '02 Oct', 'devon', ''],
+      ['planned', 'Dark mode for the editor', 48, ['ui', 'editor'], '28 Sep', 'Mara K.', ''],
+      ['planned', 'Calendar heatmap of my writing streak', 22, ['stats'], '25 Sep', 'Ezra', ''],
+      ['planned', 'Passcode lock for the app', 19, ['privacy'], '20 Sep', 'Kenji', ''],
+      ['pending', 'Share an entry as an image', 5, ['sharing'], '07 Oct', 'Lina', '']
+    ];
+    var rows = raw.map(function (r) {
+      return { status: r[0], title: r[1], votes: r[2], tags: r[3], date: r[4], who: r[5],
+        isNew: r[6].indexOf('new') > -1, hidden: r[6].indexOf('hidden') > -1, cls: r[6].indexOf('new') > -1 ? 'is-new' : '' };
+    });
+    return {
+      rows: rows,
+      openStatuses: open,
+      openSummary: function (v) { return v.length === open.length && open.every(function (s) { return v.indexOf(s) > -1; }) ? 'Open' : undefined; },
+      statusOptions: (L.STATUS_ORDER || []).map(function (s) { return { value: s, label: L.STATUS[s].label, icon: React.createElement(L.StatusIcon, { status: s }) }; }),
+      boardOptions: [{ value: 'features', label: 'Features' }, { value: 'bugs', label: 'Bugs' }, { value: 'internal', label: 'Internal (private)' }],
+      tagOptions: ['editor', 'ui', 'ios', 'android', 'sync', 'privacy', 'export', 'import', 'stats'].map(function (t) { return { value: t, label: t }; }),
+      visOptions: [{ value: 'public', label: 'On the board' }, { value: 'hidden', label: 'Hidden' }]
+    };
+  }
+}
+</script>
+</body>
+</html>

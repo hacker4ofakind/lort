@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lort landing page</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/lort/tokens.css">
+<link rel="stylesheet" href="ds/lort/components/bundle.css">
+<script src="ds/lort/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Figtree:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+/* /lort-landing is Lort's page, not the board's: always Lort pink, whatever primary the owner chose */
+.lort-brand{--primary:#cc3a6d;--on-primary:#ffffff;--primary-text:#f08aae;--primary-soft:#3a1e29}
+.lort-brand[data-theme="light"]{--primary-text:#b02a5a;--primary-soft:#f9e3eb}
+a{color:inherit;text-decoration:none}
+::selection{background:var(--primary);color:var(--on-primary)}
+.wrap{max-width:1200px;margin:0 auto;padding:0 40px;box-sizing:border-box}
+.hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:56px;align-items:center;padding-top:48px;padding-bottom:96px}
+.hero h1{margin:0;font-family:var(--font-display);font-weight:800;font-size:72px;line-height:72px;letter-spacing:-0.04em;text-wrap:balance}
+.stage{background:var(--primary);border-radius:28px;padding:34px 30px 40px;box-shadow:var(--shadow-inset-sm);display:flex;flex-direction:column;gap:12px;--lt-si-ground:var(--surface)}
+.tilt-a{transform:rotate(-1.2deg)}
+.tilt-b{transform:rotate(0.8deg) translateX(18px)}
+.tilt-c{transform:rotate(-0.4deg)}
+.h2{margin:0;font-family:var(--font-display);font-weight:800;font-size:48px;line-height:50px;letter-spacing:-0.03em;text-wrap:balance}
+.lede{margin:14px 0 0;font-size:19px;line-height:29px;color:var(--ink-2);max-width:56ch}
+.code{position:relative;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:14px;line-height:22px;background:var(--ground);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 52px 14px 18px;color:var(--ink);box-shadow:var(--shadow-inset-sm);white-space:pre;overflow-x:auto}
+.steps .code{background:var(--surface);border-color:var(--border-strong);box-shadow:var(--shadow-inset-sm),var(--shadow-card-float)}
+.steps .copy:hover{background:var(--surface-3)}
+.copy{all:unset;position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:999px;display:grid;place-items:center;color:var(--muted);cursor:pointer}
+.copy:hover{background:var(--surface-2);color:var(--ink)}
+.copy:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.steps{display:flex;flex-direction:column;gap:30px;margin-top:40px;max-width:860px}
+.step{display:grid;grid-template-columns:24px minmax(0,1fr);gap:14px;align-items:start;--lt-si-ground:var(--ground)}
+.step-icon{display:flex;padding-top:1px}
+.step b{font-size:18px}
+.step p{margin:6px 0 12px;color:var(--ink-2);font-size:16px;line-height:24px}
+.pipe{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:relative;margin-top:44px}
+.pipe-line{position:absolute;left:10%;right:10%;top:17px;height:4px;border-radius:2px;background:var(--surface-2)}
+.pipe-stop{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;position:relative;z-index:1;--lt-si-ground:var(--ground)}
+.pipe-stop b{font-size:15px}
+.pipe-txt{display:flex;flex-direction:column;gap:4px;align-items:center}
+.pipe-stop span{font-size:14px;line-height:20px;color:var(--muted);max-width:18ch}
+.mcp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:56px;align-items:center;padding:64px 0 32px}
+.pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;padding-bottom:40px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:28px;display:flex;flex-direction:column;gap:24px;--lt-si-ground:var(--surface)}
+.h3{margin:0;font-family:var(--font-display);font-weight:800;font-size:32px;line-height:36px;letter-spacing:-0.025em}
+.tile p,.mcp p{margin:12px 0 0;font-size:17px;line-height:27px;color:var(--ink-2)}
+.demo{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.demo .lt-composer{width:100%;box-sizing:border-box}
+/* landing demo only: show the send button as it looks once there is text */
+.demo .lt-composer .lt-btn-primary:disabled{opacity:1;cursor:pointer}
+.end{background:var(--primary);color:var(--on-primary);border-radius:32px;padding:64px 56px;display:flex;align-items:center;gap:40px;box-shadow:var(--shadow-inset-sm)}
+.end-cta{display:inline-flex;align-items:center;gap:8px;flex:none;height:54px;padding:0 26px;border-radius:999px;background:var(--ink);color:var(--ground);font-weight:700;font-size:16px;box-shadow:var(--shadow-card-float)}
+.end-cta:hover{background:var(--on-primary)}
+.end-cta:focus-visible{outline:3px solid var(--on-primary);outline-offset:3px}
+.end .h2{font-size:54px;line-height:56px}
+.cta-lg{height:54px !important;padding:0 26px !important;font-size:16px !important}
+@media (max-width:760px){
+  .wrap{padding:0 16px}
+  .hero,.mcp,.pair{grid-template-columns:minmax(0,1fr);gap:32px}
+  .hero{padding-top:24px;padding-bottom:64px}
+  .hero h1{font-size:44px;line-height:46px}
+  .h2,.end .h2{font-size:34px;line-height:38px}
+  .lede{font-size:17px;line-height:26px}
+  .pipe{grid-template-columns:minmax(0,1fr);gap:18px}
+  .pipe-line{left:17px;right:auto;top:10px;bottom:10px;width:4px;height:auto}
+  .pipe-stop{flex-direction:row;align-items:center;text-align:left;gap:12px}
+  .pipe-txt{align-items:flex-start}
+  .pipe-stop span{max-width:none}
+  .stage{padding:20px 14px 24px;border-radius:24px}
+  .tilt-b{transform:rotate(0.8deg) translateX(6px)}
+  .end{flex-direction:column;align-items:flex-start;padding:36px 24px}
+  .hide-sm{display:none}
+}
+</style>
+</helmet>
+<div class="lort-brand" data-theme="dark" style="background: var(--ground); color: var(--ink); font-family: var(--font-sans)">
+  <header class="wrap" style="height: 80px; display: flex; align-items: center; gap: 24px">
+    <a href="#" style="font-family: var(--font-display); font-weight: 800; font-size: 26px; letter-spacing: -0.03em">Lort</a>
+    <span style="flex: 1"></span>
+    <a href="#" class="hide-sm" style="font-size: 15px; font-weight: 600; color: var(--muted)">Back to Driftnote’s board</a>
+    <x-import component-from-global-scope="Lort.Button" variant="secondary" icon="github">GitHub</x-import>
+  </header>
+
+  <section class="wrap hero">
+    <div>
+      <h1>Driftnote’s feedback board runs on Lort. Why not yours?</h1>
+      <p class="lede" style="font-size: 20px; line-height: 31px">Lort is a free, open-source feedback board, roadmap and changelog that you host on your own server. People stick dots on what they want while you build it, and they find out once it’s done.</p>
+      <div style="display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap">
+        <x-import component-from-global-scope="Lort.Button" variant="primary" icon="github" class-name="cta-lg">Get Lort on GitHub</x-import>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="tilt-a"><x-import component-from-global-scope="Lort.RequestCard" request="{{demo1}}" href="#" hint-size="100%,150px"></x-import></div>
+      <div class="tilt-b"><x-import component-from-global-scope="Lort.RequestCard" request="{{demo2}}" href="#" hint-size="100%,150px"></x-import></div>
+      <div class="tilt-c"><x-import component-from-global-scope="Lort.RequestCard" request="{{demo3}}" href="#" hint-size="100%,150px"></x-import></div>
+    </div>
+  </section>
+
+  <section class="wrap" style="padding-bottom: 80px">
+    <h2 class="h2" style="max-width: 18ch">From suggestion to shipped</h2>
+    <p class="lede">Every request moves along the same line. When it reaches Completed, everyone who asked for it or stuck a dot on it gets an email.</p>
+    <div class="pipe">
+      <div class="pipe-line" aria-hidden="true"></div>
+      <sc-for list="{{pipe}}" as="p" hint-placeholder-count="5">
+        <div class="pipe-stop">
+          <x-import component-from-global-scope="Lort.StatusIcon" status="{{p.s}}" keyline="{{true}}" size="{{38}}"></x-import>
+          <div class="pipe-txt"><b>{{p.l}}</b><span>{{p.d}}</span></div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section class="wrap" style="padding-bottom: 40px">
+    <h2 class="h2">Run it on your own server</h2>
+    <p class="lede">One Docker container holds the board, the database, HTTPS and email.</p>
+    <div class="steps">
+      <div class="step"><span class="step-icon"><x-import component-from-global-scope="Lort.StatusIcon" status="reviewing" keyline="{{true}}" size="{{24}}"></x-import></span><div><b>Point a subdomain at your server</b><p>Any VPS works. Add an A record like this at your DNS provider:</p><div class="code">feedback.yoursite.com  A  203.0.113.24</div></div></div>
+      <div class="step"><span class="step-icon"><x-import component-from-global-scope="Lort.StatusIcon" status="progress" keyline="{{true}}" size="{{24}}"></x-import></span><div><b>Clone it and run the setup script</b><p>The script checks for Docker, then walks you through setup and builds the image.</p><div class="code"><button class="copy" aria-label="Copy commands"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9.67A2.67 2.67 0 0 1 9.67 7h8.66A2.67 2.67 0 0 1 21 9.67v8.66A2.67 2.67 0 0 1 18.33 21H9.67A2.67 2.67 0 0 1 7 18.33zM4.01 16.75A2 2 0 0 1 3 15V5c0-1.1.9-2 2-2h10c.75 0 1.16.38 1.5 1"></path></svg></button>git clone https://github.com/hacker4ofakind/lort &amp;&amp; cd lort
+./setup.sh</div></div></div>
+      <div class="step"><span class="step-icon"><x-import component-from-global-scope="Lort.StatusIcon" status="completed" keyline="{{true}}" size="{{24}}"></x-import></span><div><b>Start it</b><p>The script prints this exact line for your server. Run it and your board is live.</p><div class="code"><button class="copy" aria-label="Copy command"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9.67A2.67 2.67 0 0 1 9.67 7h8.66A2.67 2.67 0 0 1 21 9.67v8.66A2.67 2.67 0 0 1 18.33 21H9.67A2.67 2.67 0 0 1 7 18.33zM4.01 16.75A2 2 0 0 1 3 15V5c0-1.1.9-2 2-2h10c.75 0 1.16.38 1.5 1"></path></svg></button>docker run -d --name lort --restart unless-stopped \
+  -p 80:80 -p 443:443 -v lort_data:/data --env-file .env lort</div></div></div>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="mcp">
+      <div>
+        <h3 class="h3" style="font-size: 40px; line-height: 44px">Your agent can run the board</h3>
+        <p>Every Lort comes with an MCP server. Ask Claude Code or Cursor to triage new requests, move things on the roadmap or write the changelog. Webhooks tell Discord, Slack or your own code what happened.</p>
+      </div>
+      <div class="tile" style="gap: 14px; padding: 22px">
+        <div class="code"><button class="copy" aria-label="Copy command"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9.67A2.67 2.67 0 0 1 9.67 7h8.66A2.67 2.67 0 0 1 21 9.67v8.66A2.67 2.67 0 0 1 18.33 21H9.67A2.67 2.67 0 0 1 7 18.33zM4.01 16.75A2 2 0 0 1 3 15V5c0-1.1.9-2 2-2h10c.75 0 1.16.38 1.5 1"></path></svg></button>claude mcp add --transport http lort \
+  https://feedback.yoursite.com/mcp \
+  --header "Authorization: Bearer lort_…"</div>
+        <p style="margin: 0 2px; font-size: 15px; line-height: 23px; color: var(--muted)">“Move every bug with more than 20 votes to Planned and draft a changelog for what shipped this week.”</p>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="tile">
+        <div><h3 class="h3">Say it instead of typing it</h3><p>Turn on voice dictation and Whisper runs on your server, so nothing leaves it. Screenshots go in the same box.</p></div>
+        <div class="demo" style="margin-top: auto"><x-import component-from-global-scope="Lort.Composer" placeholder="Hold the mic and just say it…" voice-enabled="{{true}}" allow-images="{{true}}" hint-size="100%,130px"></x-import></div>
+      </div>
+      <div class="tile">
+        <div><h3 class="h3">Mark it done, and everyone hears</h3><p>Completing a request emails everyone who voted, after a minute in which you can still undo it. Changelog posts can complete the requests they mention, now or on a schedule.</p></div>
+        <div class="demo" style="margin-top: auto">
+          <x-import component-from-global-scope="Lort.Toast" action-label="Undo" countdown="{{60}}">Marked as completed · 61 people will be notified</x-import>
+          <div class="lt-bar lt-triage" role="toolbar" aria-label="Triage"><x-import component-from-global-scope="Lort.Button" variant="primary" disabled="{{true}}">Completed</x-import></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" style="padding-top: 40px; padding-bottom: 80px">
+    <div class="end">
+      <div style="flex: 1; min-width: 0">
+        <h2 class="h2">Your users already have ideas. Give them a wall to stick them on.</h2>
+        <p style="margin: 16px 0 0; font-size: 18px; line-height: 28px">Free and open source under GPL-3.0, with no paid plans and no tracking.</p>
+      </div>
+      <a href="#" class="end-cta"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2c2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2a4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6c-.6.6-.6 1.2-.5 2V21"></path></svg>Get Lort on GitHub</a>
+    </div>
+  </section>
+
+  <footer class="wrap" style="padding-bottom: 40px">
+    <div style="border-top: 1px solid var(--border); padding-top: 20px; display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; color: var(--muted)">
+      <span style="font-family: var(--font-display); font-weight: 800; color: var(--ink)">Lort</span>
+      <span>Open source under GPL-3.0</span>
+      <span style="flex: 1"></span>
+      <a href="#">GitHub</a><a href="#">Docs</a>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3033}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      demo1: { title: 'Dark mode for the editor', body: 'Writing at night is rough on the eyes. A proper dark theme would make Driftnote my go-to before bed.', status: 'planned', board: 'Features', author: { name: 'Mara K.' }, comments: 9, votes: 48, voted: true },
+      demo2: { title: 'Export every entry as Markdown', body: 'One click to download everything as .md files, so I can keep a backup in Obsidian.', status: 'progress', board: 'Features', author: { name: 'devon' }, comments: 5, votes: 36, voted: false },
+      demo3: { title: 'Tag entries with #hashtags', body: 'Type #work or #travel anywhere and have it show up as a filter.', status: 'completed', board: 'Features', author: { name: 'Ade O.' }, comments: 12, votes: 61, voted: false },
+      pipe: [
+        { s: 'pending', l: 'Pending', d: 'Someone suggests it' },
+        { s: 'reviewing', l: 'Reviewing', d: 'You take a look' },
+        { s: 'planned', l: 'Planned', d: 'It’s on the roadmap' },
+        { s: 'progress', l: 'In progress', d: 'You’re building it' },
+        { s: 'completed', l: 'Completed', d: 'Everyone who wanted it gets an email' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

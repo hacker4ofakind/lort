@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dashboard request page</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/lort/tokens.css">
+<link rel="stylesheet" href="ds/lort/components/bundle.css">
+<script src="ds/lort/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.side-item{display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;border-radius:999px;font-size:15px;font-weight:600;color:var(--muted)}
+.side-item.on{background:var(--surface-2);color:var(--ink)}
+.menu-row{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:10px;width:100%;height:38px;padding:0 10px;border-radius:12px;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer}
+.menu-row:hover{background:var(--surface-2)}
+.menu-row:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+</style>
+</helmet>
+<div data-theme="dark" style="position: relative; min-height: 1300px; display: flex; background: var(--ground); color: var(--ink); font-family: var(--font-sans)">
+  <aside aria-label="Dashboard" style="width: 244px; flex: none; padding: 16px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; background: var(--ground-sunken); border-right: 1px solid var(--surface-2)">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px">
+      <span style="width: 30px; height: 30px; border-radius: var(--radius-sm); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 15px; transform: rotate(var(--tilt-mark)); box-shadow: var(--shadow-sticker)">D</span>
+      <span style="font-family: var(--font-display); font-weight: 800; font-size: 17px; flex: 1">Driftnote</span>
+      <button aria-label="Collapse sidebar" style="all: unset; cursor: pointer; width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; color: var(--muted)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 4v16M15 10l-2 2l2 2"></path></svg></button>
+    </div>
+    <a class="side-item on" href="#" aria-current="page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM4 13h3l3 3h4l3-3h3"></path></svg>Requests<span style="margin-left: auto; font-size: 12px; font-weight: 700; background: var(--primary); color: var(--on-primary); border-radius: 999px; padding: 1px 8px">3 new</span></a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6M14 4h6M4 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM14 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"></path></svg>Roadmap</a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 6h3a1 1 0 0 1 1 1v11a2 2 0 0 1-4 0V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a3 3 0 0 0 3 3h11M8 8h4M8 12h4M8 16h4"></path></svg>Changelog</a>
+    <div style="flex: 1"></div>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13M12 6v13M21 6v13"></path></svg>Docs</a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 6h8M16 6h4M6 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 12h2M10 12h10M15 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 18h11M19 18h1"></path></svg>Settings</a>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 12px 8px 2px">
+      <x-import component-from-global-scope="Lort.Avatar" name="Luk" size="{{28}}" team="{{true}}"></x-import>
+      <span style="font-size: 13px; font-weight: 600; flex: 1">Luk</span>
+      <span style="font-size: 11px; color: var(--muted)">Lort 1.0</span>
+    </div>
+  </aside>
+
+  <main style="flex: 1; min-width: 0; padding: 30px 40px 170px; box-sizing: border-box">
+    <div style="max-width: 820px; margin: 0 auto">
+      <nav aria-label="Breadcrumb" style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); margin-bottom: 22px">
+        <a href="#">Requests</a><span>/</span><span>Bugs</span>
+        <span style="flex: 1"></span>
+        <span style="font-size: 13px">3 of 12 in Reviewing</span>
+      </nav>
+
+      <div style="display: flex; gap: 24px; align-items: flex-start">
+        <div style="flex: 1; min-width: 0">
+          <h1 class="display-l" style="margin: 0; text-wrap: balance">Sync drops my newest entry after a day offline</h1>
+          <div style="display: flex; align-items: center; gap: 10px; margin-top: 14px; font-size: 14px">
+            <x-import component-from-global-scope="Lort.Avatar" name="Priya S." size="{{32}}" keyline="{{true}}"></x-import>
+            <b>Priya S.</b><span style="color: var(--muted)">· 3 days ago</span>
+          </div>
+        </div>
+        <x-import component-from-global-scope="Lort.VoteSticker" count="{{21}}" subject="Sync drops my newest entry after a day offline"></x-import>
+      </div>
+
+      <p class="body" style="margin: 20px 0 0; color: var(--ink-2); max-width: 68ch">If the app has been offline for more than about 24 hours, the first sync shows a “conflict” banner and the most recent entry disappears. The older ones are fine. It’s happened three times now on a Pixel 8 with Android 15, app version 2.3.1.</p>
+
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 20px; flex-wrap: wrap">
+        <x-import component-from-global-scope="Lort.Chip" kind="status" status="reviewing"></x-import>
+        <x-import component-from-global-scope="Lort.Chip" kind="board" label="Bugs"></x-import>
+        <x-import component-from-global-scope="Lort.Chip" kind="tag" label="android"></x-import>
+        <x-import component-from-global-scope="Lort.Chip" kind="tag" label="sync"></x-import>
+        <x-import component-from-global-scope="Lort.Chip" kind="add"></x-import>
+        <x-import component-from-global-scope="Lort.Chip" kind="switch" label="On the board"></x-import>
+      </div>
+
+      <div style="height: 1px; background: var(--border); margin: 28px 0 22px"></div>
+
+      <x-import component-from-global-scope="Lort.Composer" placeholder="Reply to Priya, or leave a note for the team…" can-use-internal="{{true}}" allow-images="{{true}}" voice-enabled="{{true}}" hint-size="100%,130px"></x-import>
+
+      <section aria-label="Activity" style="margin-top: 28px; display: flex; flex-direction: column; gap: 20px">
+        <div style="display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); padding-left: 4px">
+          <x-import component-from-global-scope="Lort.StatusIcon" status="reviewing" keyline="{{true}}" size="{{20}}"></x-import>
+          <span><b style="color: var(--ink)">Luk</b> moved this to <b style="color: var(--ink)">Reviewing</b> · 2 hours ago</span>
+        </div>
+        <x-import component-from-global-scope="Lort.InternalNote" author="Luk" time="1 hour ago">Reproduced on a Pixel 8 after 26h in airplane mode. The conflict resolver keeps the server copy and throws away the local one.</x-import>
+        <div style="padding: 0 4px; position: relative">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 14px">
+            <button aria-label="devon, open member menu" aria-expanded="true" style="all: unset; cursor: pointer; border-radius: 50%; box-shadow: 0 0 0 3px var(--focus)">
+              <x-import component-from-global-scope="Lort.Avatar" name="devon" size="{{26}}"></x-import>
+            </button>
+            <b>devon</b><span style="color: var(--muted)">· yesterday</span>
+          </div>
+          <div role="menu" aria-label="devon" style="position: absolute; left: 4px; top: 36px; z-index: 30; width: 270px; padding: 12px; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-float)">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 2px 4px 10px; border-bottom: 1px solid var(--border); margin-bottom: 6px">
+              <x-import component-from-global-scope="Lort.Avatar" name="devon" size="{{36}}"></x-import>
+              <div style="min-width: 0">
+                <div style="font-weight: 700; font-size: 14px">devon</div>
+                <div style="font-size: 12px; color: var(--muted)">devon@hey.com · joined Aug 2026</div>
+                <div style="font-size: 12px; color: var(--muted)">4 requests · 31 votes · verified email</div>
+              </div>
+            </div>
+            <button class="menu-row" role="menuitem">Copy password reset link</button>
+            <button class="menu-row" role="menuitem" style="color: var(--danger-text)">Ban devon</button>
+          </div>
+          <p class="body" style="margin: 6px 0 0 34px; color: var(--ink-2)">Same thing on iOS 18. I lost Monday’s entry.</p>
+          <div style="margin: 4px 0 0 34px"><a href="#" style="font-size: 13px; font-weight: 600; color: var(--muted)">Reply</a></div>
+          <div style="margin: 12px 0 0 34px; padding: 14px 16px; background: var(--surface); border-radius: var(--radius-md)">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 14px">
+              <x-import component-from-global-scope="Lort.Avatar" name="Luk" size="{{26}}" team="{{true}}"></x-import>
+              <b>Luk</b><span style="font-size: 11px; font-weight: 700; color: var(--on-primary); background: var(--primary); border-radius: var(--radius-pill); padding: 2px 8px">Team</span><span style="color: var(--muted)">· yesterday</span>
+            </div>
+            <p class="body" style="margin: 6px 0 0 34px; color: var(--ink-2)">Thanks devon! Which app version are you on? Settings → About shows it.</p>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); padding-left: 4px">
+          <x-import component-from-global-scope="Lort.StatusIcon" status="pending" keyline="{{true}}" size="{{20}}"></x-import>
+          <span><b style="color: var(--ink)">Priya S.</b> posted this in Bugs · 11 Oct</span>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div style="position: fixed; z-index: 20; left: 244px; right: 0; bottom: 28px; display: flex; justify-content: center; pointer-events: none">
+    <div style="pointer-events: auto"><x-import component-from-global-scope="Lort.TriageBar" status="reviewing" hint-size="470px,56px"></x-import></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
