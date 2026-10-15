@@ -19,12 +19,19 @@ func Register(app core.App, svc *requests.Service) {
 	app.OnRecordCreateRequest("comments").BindFunc(onCommentCreate)
 	app.OnRecordDeleteRequest("boards").BindFunc(onBoardDelete)
 	// Keep upvoteCount true when votes go away without ToggleVote, e.g. when a deleted
-	// account cascades into its votes. This runs inside the delete's transaction.
+	// account cascades into its votes. PocketBase's own delete handler runs after this one
+	// and commits its transaction before returning, so the delete and the recount share a
+	// transaction opened here (inside a cascade it is the outer one, reused).
 	app.OnRecordDeleteExecute("votes").BindFunc(func(e *core.RecordEvent) error {
-		if err := e.Next(); err != nil {
-			return err
-		}
-		return svc.Recount(e.App, e.Record.GetString("request"))
+		original := e.App
+		defer func() { e.App = original }()
+		return e.App.RunInTransaction(func(tx core.App) error {
+			e.App = tx
+			if err := e.Next(); err != nil {
+				return err
+			}
+			return svc.Recount(tx, e.Record.GetString("request"))
+		})
 	})
 }
 

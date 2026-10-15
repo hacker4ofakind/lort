@@ -22,8 +22,8 @@ export interface ComposerProps {
   /** Called while recording is toggled; the app streams audio to /api/transcribe. */
   onDictationChange?: (recording: boolean) => void;
   /**
-   * Called with the draft. Return a promise to keep the draft until it resolves: the field
-   * clears on success, and on rejection the draft stays and the error's message is shown.
+   * Called with the draft. Return a promise to keep the draft until it resolves: the draft is
+   * locked while it sends, clears on success, and on rejection stays with the error's message shown.
    */
   onSubmit?: (value: ComposerSubmit) => void | Promise<void>;
   className?: string;
@@ -59,7 +59,7 @@ export function Composer({
   }, [images]);
 
   const addFiles = (list: FileList | null) => {
-    if (!list) return;
+    if (!list || pending) return;
     const picked = Array.from(list).filter((f) => f.type.startsWith('image/'));
     const tooBig = picked.find((f) => f.size > MAX_BYTES);
     if (tooBig) setError(`${tooBig.name} is over 5 MB. Try a smaller screenshot.`);
@@ -108,6 +108,7 @@ export function Composer({
                 type="button"
                 className="lt-thumb-x"
                 aria-label={`Remove ${images[i]?.name ?? 'image'}`}
+                disabled={pending}
                 onClick={() => setImages(images.filter((_, j) => j !== i))}
               >
                 <Icon name="x" size={12} strokeWidth={3} />
@@ -121,8 +122,12 @@ export function Composer({
         className="lt-composer-field"
         rows={2}
         value={text}
+        readOnly={pending}
+        aria-busy={pending}
         placeholder={recording ? 'Listening…' : internal ? 'Leave a note only the team can see…' : placeholder}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          if (!pending) setText(e.target.value);
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
@@ -154,7 +159,7 @@ export function Composer({
               icon="photo"
               iconOnly
               aria-label={`Attach images (up to ${MAX_IMAGES})`}
-              disabled={images.length >= MAX_IMAGES}
+              disabled={pending || images.length >= MAX_IMAGES}
               onClick={() => fileRef.current?.click()}
             />
           </>
@@ -163,6 +168,7 @@ export function Composer({
           <button
             type="button"
             className="lt-visibility"
+            disabled={pending}
             aria-label={`Visibility: ${internal ? 'Internal' : 'Public'}. Switch to ${internal ? 'public' : 'internal'}`}
             onClick={() => setVisibility(internal ? 'public' : 'internal')}
           >
@@ -179,6 +185,7 @@ export function Composer({
             aria-label={recording ? 'Stop dictation' : 'Dictate'}
             aria-pressed={recording}
             className={cx(recording && 'is-recording')}
+            disabled={pending}
             onClick={() => {
               setRecording(!recording);
               onDictationChange?.(!recording);

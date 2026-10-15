@@ -332,3 +332,37 @@ func TestCreateRequestWithImage(t *testing.T) {
 		}
 	})
 }
+
+func TestVoteDeleteAndRecountAreAtomic(t *testing.T) {
+	f := newFixture(t)
+	svc := requests.New(f.app)
+	r := testutil.Request(t, f.app, f.features, f.mara, "Export", "pending", 0)
+	if _, _, err := svc.ToggleVote(r.Id, f.mara.Id); err != nil {
+		t.Fatal(err)
+	}
+	vote, err := f.app.FindFirstRecordByData("votes", "request", r.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make the recount fail: the vote must then survive with the count it matches.
+	if _, err := f.app.DB().NewQuery(`CREATE TRIGGER fail_recount BEFORE UPDATE OF upvoteCount ON requests
+		BEGIN SELECT RAISE(ABORT, 'recount failed'); END`).Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.app.Delete(vote); err == nil {
+		t.Fatal("deleting the vote should fail when its recount fails")
+	}
+	if _, err := f.app.FindRecordById("votes", vote.Id); err != nil {
+		t.Error("the vote was deleted although its recount failed")
+	}
+	if _, err := f.app.DB().NewQuery("DROP TRIGGER fail_recount").Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.app.Delete(vote); err != nil {
+		t.Fatal(err)
+	}
+	r, _ = f.app.FindRecordById("requests", r.Id)
+	if r.GetInt("upvoteCount") != 0 {
+		t.Errorf("upvoteCount = %d after a standalone vote delete, want 0", r.GetInt("upvoteCount"))
+	}
+}
