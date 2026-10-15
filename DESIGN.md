@@ -272,7 +272,7 @@ Flat at rest; tonal layering (ground → surface → surface-2 → surface-3) ca
 - **Sticker** (`0 3px 8px rgba(0,0,0,0.45)` dark / `0 2px 6px rgba(60,30,20,0.28)` light): voted stickers and the app logo mark.
 - **Float** (`0 14px 36px rgba(0,0,0,0.5)` / `0 14px 36px rgba(60,40,30,0.18)`): floating bars, menus, modals.
 - **Card float** (`0 8px 20px rgba(0,0,0,0.35)` / `0 8px 20px rgba(60,40,30,0.12)`): small floating cards and a card being dragged.
-- **Inset small** (`inset 0 2px 3px -1px rgba(0,0,0,0.9)` / `inset 0 2px 3px -1px rgba(60,30,20,0.2)`): pressed slightly into the page along the top edge. Used on the SortTabs track, the FloatingBar, the TriageBar and toasts; layered with Float on the floating ones (`box-shadow: var(--shadow-inset-sm), var(--shadow-float)`). Containers only; buttons and cards stay flat.
+- **Inset small** (`inset 0 1.7px 2.55px -0.85px rgba(0,0,0,0.9)` / `inset 0 1.7px 2.55px -0.85px rgba(60,30,20,0.2)`): pressed slightly into the page along the top edge. Used on the SortTabs track, the FloatingBar, the TriageBar and toasts; layered with Float on the floating ones (`box-shadow: var(--shadow-inset-sm), var(--shadow-float)`). Containers only; buttons and cards stay flat.
 
 Each shadow has a utility class in `design/components/lort.css`: `.lt-shadow-sticker`, `.lt-shadow-float`, `.lt-shadow-card-float`, `.lt-shadow-inset-sm`.
 
