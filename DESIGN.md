@@ -279,6 +279,8 @@ Each shadow has a utility class in `design/components/lort.css`: `.lt-shadow-sti
 ### Named Rules
 **The Only-Stickers-Tilt Rule.** Voted stickers rotate −7° and the logo mark −4°. Nothing else rotates.
 
+**The Landing Exception.** `/lort-landing` is Lort's own page, not the board's. It always uses Lort Pink (`#cc3a6d`) whatever primary the owner picked, puts its hero and closing call-to-action on pink slabs, and tilts its three hero cards. Nowhere else breaks the Owner's Colour Rule or the Only-Stickers-Tilt Rule.
+
 ## Shapes
 
 Pills for everything clickable (buttons, chips, tabs, inputs, nav, floating bars). Soft rectangles for containers: cards and notes 18px, composer and modals 22px, menus and reply bubbles 16px, thumbnails and the logo mark 10px. Circles (with a keyline ring) for stickers, status icons and avatars.
@@ -293,7 +295,7 @@ React 18 + TypeScript source for each lives in `design/components/src/` (styles 
 - **SortTabs:** Trending / Newest with an ink indicator that slides (Motion `layoutId`); the selected label inverts.
 - **FloatingBar:** sort tabs, Board and Status drop-ups (open upward, Clear at the bottom, state in the URL), primary "Suggest something".
 - **RequestCard:** sticker left; title, two-line excerpt, meta row (status, board pill, author, comments).
-- **Composer:** prompt-box comment field: images (≤3), a Public/Internal toggle for admins (no chevron; flat in Public with a hover fill; borderless in Internal with a note-tint hover and a small lock tip), mic only when voice is enabled, round send.
+- **Composer:** prompt-box comment field for every signed-in user: images (≤3), a Public/Internal toggle for admins (no chevron; flat in Public with a hover fill; borderless in Internal with a note-tint hover and a small lock tip), mic only when voice is enabled, round send.
 - **TriageBar:** status-driven actions for the dashboard request page; forward action is the one primary button, last.
 - **InternalNote:** note-bg, 2px dashed note-border, "Only the team sees this".
 - **Avatar:** picture or initial on a warm fill picked from the name; keyline on public pages; primary ring for team members.
