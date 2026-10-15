@@ -40,7 +40,7 @@ Both scripts behave identically and speak in Lort's voice. Steps, in order:
 4. **Email (optional).** "Send emails? (verification, 'it shipped', changelog)". Yes starts the Resend walkthrough: create an account → add the domain → add the DNS records it shows → paste an API key. The script verifies the key against the Resend API. A hidden "other SMTP" choice (type `smtp` at the prompt) asks for host, port, username, password and sender instead. No means every email feature is off.
 5. **Voice dictation (optional).** Explain that it runs Whisper on the server. If total RAM is under 2 GB, warn and default to No.
 6. **Cloudflare Turnstile (optional).** Ask for site key and secret.
-7. **Ports.** Check whether 80 and 443 are free. Free: Lort terminates HTTPS itself (certmagic, Let's Encrypt). Taken: Lort listens on plain HTTP `:4052`; the script prints a ready-to-paste nginx block and Caddy block for the URL, plus a short prompt the owner can hand to their coding agent ("Add a reverse proxy from feedback.yoursite.com to 127.0.0.1:4052 with HTTPS…").
+7. **Ports.** Check whether 80 and 443 are free. Free: Lort terminates HTTPS itself (PocketBase's built-in Let's Encrypt autocert). Taken: Lort listens on plain HTTP `:4052`; the script prints a ready-to-paste nginx block and Caddy block for the URL, plus a short prompt the owner can hand to their coding agent ("Add a reverse proxy from feedback.yoursite.com to 127.0.0.1:4052 with HTTPS…").
 8. **Write `.env`** (mode 600) with every answer and a random 32-byte `LORT_ENCRYPTION_KEY`, then run `docker build -t lort .`.
 9. **Print the run command** for the detected mode, exactly:
    - HTTPS mode: `docker run -d --name lort --restart unless-stopped -p 80:80 -p 443:443 -v lort_data:/data --env-file .env lort`
@@ -51,7 +51,7 @@ Re-running the script with an existing `.env` offers to keep each saved answer.
 ### 1.3 Other script modes
 - `--update`: creates a backup inside the running container (`docker exec lort lort backup create pre-update`), tags the current image `lort:previous`, runs `git pull`, rebuilds, then stops, removes and re-runs the container with the same command.
 - `--rollback`: re-runs the container from `lort:previous` and restores the `pre-update` backup.
-- `--reset-admin`: asks for an admin email and a new password and runs `docker exec -it lort lort admin reset-password <email>`. The dashboard sign-in page points here ("Forgot it? On the server, run `./setup.sh --reset-admin`").
+- `--reset-admin`: asks for an admin email and a new password (hidden input) and runs PocketBase's built-in `docker exec lort lort superuser update <email> <password>`. The dashboard sign-in page points here ("Forgot it? On the server, run `./setup.sh --reset-admin`").
 
 ### 1.4 Configuration lifecycle
 `.env` seeds the first boot. After that the database is the source of truth: email, voice, Turnstile and branding are changed in Settings, and `.env` values for them are ignored once a settings record exists. `LORT_ADMIN_EMAIL` / `LORT_ADMIN_PASSWORD` are only used when no superuser exists. `LORT_URL`, `LORT_TLS` (`auto` or `off`) and `LORT_ENCRYPTION_KEY` are read on every boot. Secrets (SMTP password, API keys, S3 keys, Turnstile secret, webhook secrets) are stored encrypted with PocketBase's settings encryption using `LORT_ENCRYPTION_KEY`. No secret is ever baked into an image layer.
@@ -63,7 +63,7 @@ Re-running the script with an existing `.env` offers to keep each saved answer.
 tini (PID 1)
 └── lort            Go binary, the only public listener
     ├── PocketBase (embedded as a Go framework): data, auth, realtime SSE, files, backups
-    ├── certmagic TLS on :80/:443, or plain HTTP on :4052 when LORT_TLS=off
+    ├── TLS on :80/:443 via PocketBase's autocert (LORT_TLS=auto), or plain HTTP on :4052 (LORT_TLS=off)
     ├── reverse proxy: routes requests (2.2)
     ├── business logic: hooks, job queue, email, webhooks, trending, slugs
     ├── MCP server (official Go SDK, Streamable HTTP)
@@ -117,7 +117,7 @@ Frontend rules: shadcn components are added with `pnpm dlx shadcn@latest add …
 
 Admins are PocketBase superusers. Each superuser is linked by email to a `users` record with `isAdmin=true`, which is what their public comments and votes are attached to (shown with a Team badge). Only superusers can sign in to `/dashboard`.
 
-Access rules: public collections are readable by anyone for public boards and visible requests; writes from the browser go through `/api/lort/*` endpoints that enforce bans, rate limits, Turnstile, approval and status rules.
+Access rules: public collections are readable by anyone for public boards and visible requests. Requests and comments are created through PocketBase's record API (so image uploads work natively), guarded by API rules and Go hooks that force the author, status, visibility and counts and enforce bans, the honeypot, approval boards and one-level replies. Votes, triage, merges and team actions go through `/api/lort/*`. Admins act on the public board as their linked `users` profile: `GET /api/lort/team/me` gives the dashboard a token for it.
 
 ## 4. Statuses, triage and merging
 

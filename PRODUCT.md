@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-Next.js (App Router, `output: 'standalone'`) + shadcn/ui + Tailwind CSS + Motion + Tiptap v3 on the frontend; a single Go binary embedding PocketBase (business logic, certmagic TLS, reverse proxy, MCP server, whisper.cpp runner) on the backend; Tabler icons; one Docker image, no Compose; pnpm.
+Next.js (App Router, `output: 'standalone'`) + shadcn/ui + Tailwind CSS + Motion + Tiptap v3 on the frontend; a single Go binary embedding PocketBase (business logic, built-in Let's Encrypt TLS, reverse proxy, MCP server, whisper.cpp runner) on the backend; Tabler icons; one Docker image, no Compose; pnpm.
 
 ## Users
 
