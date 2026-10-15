@@ -23,7 +23,7 @@ colors:
   ink-2: "#d8cdc5"
   ink-2-light: "#3d3532"
   muted: "#b3a79e"
-  muted-light: "#6b615b"
+  muted-light: "#655b55"
   primary: "#cc3a6d"
   on-primary: "#ffffff"
   primary-text: "#f08aae"
@@ -43,17 +43,26 @@ colors:
   note-ink: "#e8c77e"
   note-ink-light: "#7a5a12"
   status-pending: "#eab308"
-  status-pending-light: "#ca8a04"
+  status-pending-light: "#b27703"
   status-reviewing: "#f97316"
-  status-reviewing-light: "#ea580c"
+  status-reviewing-light: "#e2520b"
   status-planned: "#38bdf8"
   status-planned-light: "#0284c7"
   status-progress: "#a855f7"
   status-progress-light: "#9333ea"
   status-completed: "#22c55e"
-  status-completed-light: "#16a34a"
+  status-completed-light: "#15913f"
   status-closed: "#ef4444"
   status-closed-light: "#dc2626"
+  status-pending-text-light: "#8f5606"
+  status-reviewing-text-light: "#b23a0a"
+  status-planned-text-light: "#0369a1"
+  status-progress-text: "#c084fc"
+  status-progress-text-light: "#7e22ce"
+  status-completed-text: "#4ade80"
+  status-completed-text-light: "#13733a"
+  status-closed-text: "#f87171"
+  status-closed-text-light: "#b91c1c"
 typography:
   display-xl:
     fontFamily: "Bricolage Grotesque, Figtree, system-ui, sans-serif"
@@ -209,7 +218,8 @@ Warm, low-chroma neutrals with one accent the board owner chooses, plus six stat
 - **Owner Pink** (`#cc3a6d`, demo value): the owner's primary colour. Primary buttons, the voted sticker, switches, selected states, the realtime "new" tint (`primary-soft`). As text or an outline use `primary-text` (`#f08aae` dark / `#b02a5a` light). Replaced at runtime by Settings → Primary colour; a custom hex is auto-adjusted so `on-primary` and `primary-text` keep 4.5:1.
 
 ### Status
-- **Pending Yellow** (`#eab308` / `#ca8a04`), **Reviewing Orange** (`#f97316` / `#ea580c`), **Planned Sky** (`#38bdf8` / `#0284c7`), **In-progress Violet** (`#a855f7` / `#9333ea`), **Completed Green** (`#22c55e` / `#16a34a`), **Closed Red** (`#ef4444` / `#dc2626`). Icon marks only (≥3:1). When a status is shown as coloured text, use the `status-*-text` variants in the design system artifact (≥4.5:1).
+- **Pending Yellow** (`#eab308` / `#b27703`), **Reviewing Orange** (`#f97316` / `#e2520b`), **Planned Sky** (`#38bdf8` / `#0284c7`), **In-progress Violet** (`#a855f7` / `#9333ea`), **Completed Green** (`#22c55e` / `#15913f`), **Closed Red** (`#ef4444` / `#dc2626`). Icon marks only, ≥3:1 on ground, surface and surface-2 in both themes.
+- **Status text** (`status-*-text`): the same statuses as coloured text with no icon, ≥4.5:1 on ground, surface and surface-2 in both themes. In dark, pending, reviewing and planned reuse the icon colour.
 
 ### Neutral
 - **Charcoal Ground** (`#1a1716` / `#f3f1ef`): page background.
@@ -217,7 +227,7 @@ Warm, low-chroma neutrals with one accent the board owner chooses, plus six stat
 - **Card Surface** (`#24201e` / `#ffffff`): cards, composer, modals.
 - **Raised Surface** (`#2c2725` / `#efeae6`): chips, floating bars, active nav pill.
 - **Button Surface** (`#352f2c` / `#e4ddd8`): secondary buttons on a bar.
-- **Warm Ink** (`#f5efea` / `#1e1a18`): titles and primary text. **Ink 2** (`#d8cdc5` / `#3d3532`): body copy. **Muted** (`#b3a79e` / `#6b615b`): meta, placeholders.
+- **Warm Ink** (`#f5efea` / `#1e1a18`): titles and primary text. **Ink 2** (`#d8cdc5` / `#3d3532`): body copy. **Muted** (`#b3a79e` / `#655b55`): meta, placeholders.
 - **Dot Spot** (`#7a6e67` / `#8c817a`): dashed outline of an empty vote spot.
 - **Note** (`note-bg`, `note-border`, `note-ink`): internal team-only notes, nowhere else.
 
@@ -256,12 +266,16 @@ Warm, low-chroma neutrals with one accent the board owner chooses, plus six stat
 
 ## Elevation & Depth
 
-Flat at rest; tonal layering (ground → surface → surface-2 → surface-3) carries most depth. Shadows mean "stuck on" or "floating above", nothing else.
+Flat at rest; tonal layering (ground → surface → surface-2 → surface-3) carries most depth. Drop shadows mean "stuck on" or "floating above"; inset shadows mean "pressed in". Nothing else.
 
 ### Shadow Vocabulary
 - **Sticker** (`0 3px 8px rgba(0,0,0,0.45)` dark / `0 2px 6px rgba(60,30,20,0.28)` light): voted stickers and the app logo mark.
 - **Float** (`0 14px 36px rgba(0,0,0,0.5)` / `0 14px 36px rgba(60,40,30,0.18)`): floating bars, menus, modals.
 - **Card float** (`0 8px 20px rgba(0,0,0,0.35)` / `0 8px 20px rgba(60,40,30,0.12)`): small floating cards and a card being dragged.
+- **Inset small** (`inset 0 2px 3px -1px rgba(0,0,0,0.9)` / `inset 0 2px 3px -1px rgba(60,30,20,0.2)`): pressed slightly into the page along the top edge. Candidates: SortTabs track, search field, empty vote spot.
+- **Inset** (`inset 0 6px 10px -4px rgba(0,0,0,0.95)` / `inset 0 5px 8px -3px rgba(60,30,20,0.26)`): a clear recessed well along the top edge. Candidates: drop zones, collapsed roadmap columns. Not assigned yet; never combined with a drop shadow on the same element.
+
+Each shadow has a utility class in `design/components/lort.css`: `.lt-shadow-sticker`, `.lt-shadow-float`, `.lt-shadow-card-float`, `.lt-shadow-inset-sm`, `.lt-shadow-inset`.
 
 ### Named Rules
 **The Only-Stickers-Tilt Rule.** Voted stickers rotate −7° and the logo mark −4°. Nothing else rotates.
@@ -272,7 +286,7 @@ Pills for everything clickable (buttons, chips, tabs, inputs, nav, floating bars
 
 ## Components
 
-The design system artifact has a live preview and usage notes for each.
+React 18 + TypeScript source for each lives in `design/components/src/` (styles in `design/components/lort.css`, classes prefixed `lt-`); copy them into the Next.js app as client components. The design system artifact has a live, interactive preview and usage notes for each.
 - **StatusIcon:** 16px circle; 1.5px ring in the status colour, 30% tint inside, solid fill rising from the bottom (0 / 28 / 50 / 80 / 100%), check for Completed, cross for Closed.
 - **VoteSticker:** 58px (40px compact). Empty: 2px dashed Dot Spot ring. Voted: primary fill, 3px keyline, −7° tilt, sticker shadow. The signature motion: slap on (scale 1.15 → 1 and rotate to −7° over ~220ms, springy) and peel off (160ms). Instant under reduced motion.
 - **Button:** primary / secondary / ghost / danger-text pills, 42px (32px small). One primary per view; no filled red buttons.
@@ -283,6 +297,9 @@ The design system artifact has a live preview and usage notes for each.
 - **Composer:** prompt-box comment field: images (≤3), Public/Internal (admins), mic only when voice is enabled, round send.
 - **TriageBar:** status-driven actions for the dashboard request page; forward action is the one primary button, last.
 - **InternalNote:** note-bg, 2px dashed note-border, "Only the team sees this".
+- **Avatar:** picture or initial on a warm fill picked from the name; keyline on public pages; primary ring for team members.
+- **FilterMenu:** multi-select drop-up behind a secondary button, custom checkboxes, Clear at the bottom; summary text on the trigger.
+- **Toast:** past-tense confirmation with at most one action; undo toasts draw a 60-second countdown bar in primary.
 
 ## Do's and Don'ts
 
