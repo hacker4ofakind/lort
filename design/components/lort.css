@@ -15,7 +15,6 @@ body { margin: 0; background: var(--ground); color: var(--ink); font-family: var
 .lt-shadow-float { box-shadow: var(--shadow-float); }
 .lt-shadow-card-float { box-shadow: var(--shadow-card-float); }
 .lt-shadow-inset-sm { box-shadow: var(--shadow-inset-sm); }
-.lt-shadow-inset { box-shadow: var(--shadow-inset); }
 
 /* ---------- Icon ---------- */
 .lt-icon { flex: none; display: block; }
@@ -106,7 +105,7 @@ button.lt-chip:hover { background: var(--surface-3); --lt-si-ground: var(--surfa
 .lt-switch.is-on::after { transform: translateX(12px); background: var(--on-primary); }
 
 /* ---------- SortTabs ---------- */
-.lt-tabs { position: relative; display: inline-flex; padding: 4px; border-radius: var(--radius-pill); background: var(--ground); border: 1px solid var(--border); }
+.lt-tabs { position: relative; display: inline-flex; padding: 4px; border-radius: var(--radius-pill); background: var(--ground); border: 1px solid var(--border); box-shadow: var(--shadow-inset-sm); }
 .lt-tabs-ind { position: absolute; top: 4px; bottom: 4px; left: 0; border-radius: var(--radius-pill); background: var(--ink); transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .lt-tab {
   all: unset; position: relative; z-index: 1; display: inline-flex; align-items: center; height: 36px; padding: 0 18px;
@@ -139,7 +138,7 @@ button.lt-chip:hover { background: var(--surface-3); --lt-si-ground: var(--surfa
 /* ---------- FloatingBar & TriageBar ---------- */
 .lt-bar {
   display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: 8px;
-  background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); box-shadow: var(--shadow-float);
+  background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); box-shadow: var(--shadow-inset-sm), var(--shadow-float);
 }
 .lt-bar-compact .lt-btn-primary.lt-btn-icon { width: 48px; height: 48px; }
 .lt-triage { gap: 4px; padding: 6px; }
@@ -177,10 +176,17 @@ button.lt-chip:hover { background: var(--surface-3); --lt-si-ground: var(--surfa
 .lt-composer-error { margin: 6px 0 0; font-size: 13px; line-height: 18px; color: var(--danger-text); }
 .lt-composer-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .lt-composer-row .lt-btn-icon { width: 40px; height: 40px; }
-.lt-visibility { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: var(--radius-pill); background: var(--surface-2); color: var(--ink-2); font-size: 13px; font-weight: 600; cursor: pointer; }
-.lt-visibility:hover { background: var(--surface-3); }
+.lt-visibility {
+  all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+  border-radius: var(--radius-pill); background: transparent; color: var(--ink-2); font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background-color 0.18s ease-out, color 0.18s ease-out;
+}
+.lt-visibility .lt-icon { transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.lt-visibility:hover { background: var(--surface-2); color: var(--ink); }
 .lt-visibility:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
-.lt-composer.is-internal .lt-visibility { color: var(--note-ink); background: transparent; border: 1px solid var(--note-border); }
+.lt-composer.is-internal .lt-visibility { color: var(--note-ink); }
+.lt-composer.is-internal .lt-visibility:hover { background: color-mix(in srgb, var(--note-border) 24%, transparent); color: var(--note-ink); }
+.lt-composer.is-internal .lt-visibility:hover .lt-icon { transform: rotate(-12deg) translateY(-1px); }
 .lt-thumbs { display: flex; gap: 8px; margin-bottom: 10px; }
 .lt-thumb { position: relative; width: 64px; height: 64px; border-radius: var(--radius-sm); overflow: hidden; background: var(--surface-2); }
 .lt-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -197,7 +203,7 @@ button.lt-chip:hover { background: var(--surface-3); --lt-si-ground: var(--surfa
 /* ---------- Toast ---------- */
 .lt-toast {
   position: relative; display: inline-flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 8px 8px 18px; overflow: hidden;
-  border-radius: var(--radius-md); background: var(--surface-2); border: 1px solid var(--border-strong); box-shadow: var(--shadow-float);
+  border-radius: var(--radius-md); background: var(--surface-2); border: 1px solid var(--border-strong); box-shadow: var(--shadow-inset-sm), var(--shadow-float);
   font-size: 14px; line-height: 20px; font-weight: 500; color: var(--ink); box-sizing: border-box;
 }
 .lt-toast-action { all: unset; height: 32px; padding: 0 12px; border-radius: var(--radius-pill); font-weight: 700; color: var(--primary-text); cursor: pointer; }
@@ -211,5 +217,6 @@ button.lt-chip:hover { background: var(--surface-3); --lt-si-ground: var(--surfa
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   .lt-vote.is-slap, .lt-vote.is-peel { animation: none; }
-  .lt-tabs-ind, .lt-tab, .lt-btn, .lt-switch, .lt-switch::after, .lt-card, .lt-composer { transition: none; }
+  .lt-tabs-ind, .lt-tab, .lt-btn, .lt-switch, .lt-switch::after, .lt-card, .lt-composer, .lt-visibility, .lt-visibility .lt-icon { transition: none; }
+  .lt-composer.is-internal .lt-visibility:hover .lt-icon { transform: none; }
 }

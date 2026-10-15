@@ -154,7 +154,6 @@ export function Composer({
           >
             <Icon name={internal ? 'lock' : 'globe'} size={15} />
             {internal ? 'Internal' : 'Public'}
-            <Icon name="chevronDown" size={14} />
           </button>
         )}
         <span className="lt-grow" />

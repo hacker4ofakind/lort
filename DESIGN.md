@@ -272,10 +272,9 @@ Flat at rest; tonal layering (ground → surface → surface-2 → surface-3) ca
 - **Sticker** (`0 3px 8px rgba(0,0,0,0.45)` dark / `0 2px 6px rgba(60,30,20,0.28)` light): voted stickers and the app logo mark.
 - **Float** (`0 14px 36px rgba(0,0,0,0.5)` / `0 14px 36px rgba(60,40,30,0.18)`): floating bars, menus, modals.
 - **Card float** (`0 8px 20px rgba(0,0,0,0.35)` / `0 8px 20px rgba(60,40,30,0.12)`): small floating cards and a card being dragged.
-- **Inset small** (`inset 0 2px 3px -1px rgba(0,0,0,0.9)` / `inset 0 2px 3px -1px rgba(60,30,20,0.2)`): pressed slightly into the page along the top edge. Candidates: SortTabs track, search field, empty vote spot.
-- **Inset** (`inset 0 6px 10px -4px rgba(0,0,0,0.95)` / `inset 0 5px 8px -3px rgba(60,30,20,0.26)`): a clear recessed well along the top edge. Candidates: drop zones, collapsed roadmap columns. Not assigned yet; never combined with a drop shadow on the same element.
+- **Inset small** (`inset 0 2px 3px -1px rgba(0,0,0,0.9)` / `inset 0 2px 3px -1px rgba(60,30,20,0.2)`): pressed slightly into the page along the top edge. Used on the SortTabs track, the FloatingBar, the TriageBar and toasts; layered with Float on the floating ones (`box-shadow: var(--shadow-inset-sm), var(--shadow-float)`). Containers only; buttons and cards stay flat.
 
-Each shadow has a utility class in `design/components/lort.css`: `.lt-shadow-sticker`, `.lt-shadow-float`, `.lt-shadow-card-float`, `.lt-shadow-inset-sm`, `.lt-shadow-inset`.
+Each shadow has a utility class in `design/components/lort.css`: `.lt-shadow-sticker`, `.lt-shadow-float`, `.lt-shadow-card-float`, `.lt-shadow-inset-sm`.
 
 ### Named Rules
 **The Only-Stickers-Tilt Rule.** Voted stickers rotate −7° and the logo mark −4°. Nothing else rotates.
@@ -294,7 +293,7 @@ React 18 + TypeScript source for each lives in `design/components/src/` (styles 
 - **SortTabs:** Trending / Newest with an ink indicator that slides (Motion `layoutId`); the selected label inverts.
 - **FloatingBar:** sort tabs, Board and Status drop-ups (open upward, Clear at the bottom, state in the URL), primary "Suggest something".
 - **RequestCard:** sticker left; title, two-line excerpt, meta row (status, board pill, author, comments).
-- **Composer:** prompt-box comment field: images (≤3), Public/Internal (admins), mic only when voice is enabled, round send.
+- **Composer:** prompt-box comment field: images (≤3), a Public/Internal toggle for admins (no chevron; flat in Public with a hover fill; borderless in Internal with a note-tint hover and a small lock tip), mic only when voice is enabled, round send.
 - **TriageBar:** status-driven actions for the dashboard request page; forward action is the one primary button, last.
 - **InternalNote:** note-bg, 2px dashed note-border, "Only the team sees this".
 - **Avatar:** picture or initial on a warm fill picked from the name; keyline on public pages; primary ring for team members.
