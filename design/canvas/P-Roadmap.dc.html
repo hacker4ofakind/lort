@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Public roadmap</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/lort/tokens.css">
+<link rel="stylesheet" href="ds/lort/components/bundle.css">
+<script src="ds/lort/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.rm-card{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);--lt-si-ground:var(--surface)}
+.rm-card:hover{background:var(--surface-2)}
+.rm-title{font-family:var(--font-display);font-size:16px;line-height:21px;font-weight:700;letter-spacing:-0.01em}
+.rm-meta{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:13px;color:var(--muted);font-weight:500}
+.rm-pill{background:var(--surface-2);border-radius:999px;padding:2px 9px}
+</style>
+</helmet>
+<div data-theme="dark" style="min-height: 1040px; background: var(--ground); color: var(--ink); font-family: var(--font-sans); padding-bottom: 60px; box-sizing: border-box">
+  <header style="max-width: 1240px; margin: 0 auto; padding: 0 32px; height: 76px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap">
+    <a href="#" style="display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 800; font-size: 19px">
+      <span style="width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-size: 16px; transform: rotate(var(--tilt-mark)); box-shadow: var(--shadow-sticker)">D</span>Driftnote
+    </a>
+    <nav aria-label="Board" style="display: flex; gap: 4px; margin-left: 10px">
+      <a href="#" style="font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-pill); color: var(--muted)">Feedback</a>
+      <a href="#" aria-current="page" style="font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-pill); background: var(--surface-2)">Roadmap</a>
+      <a href="#" style="font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-pill); color: var(--muted)">Changelog</a>
+    </nav>
+    <div style="flex: 1"></div>
+    <label style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: var(--radius-pill); background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 240px; box-sizing: border-box">
+      <x-import component-from-global-scope="Lort.Icon" name="search" size="{{16}}"></x-import>
+      <input type="search" placeholder="Search ideas" aria-label="Search ideas" style="all: unset; flex: 1; font-size: 14px; color: var(--ink)">
+    </label>
+    <x-import component-from-global-scope="Lort.Avatar" name="Luk" size="{{38}}" keyline="{{true}}"></x-import>
+  </header>
+
+  <main style="max-width: 1240px; margin: 0 auto; padding: 36px 32px 0; box-sizing: border-box">
+    <h1 class="display-xl" style="margin: 0">What’s coming to Driftnote</h1>
+    <p class="body-lg" style="margin: 12px 0 32px; color: var(--ink-2)">Everything the team has committed to, what’s being built right now, and what just shipped.</p>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: start">
+      <sc-for list="{{columns}}" as="col" hint-placeholder-count="3">
+        <section aria-label="{{col.label}}" style="background: var(--ground-sunken); border-radius: var(--radius-xl); padding: 16px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 2px 4px 2px">
+            <x-import component-from-global-scope="Lort.StatusIcon" status="{{col.status}}" keyline="{{true}}" show-label="{{true}}" size="{{20}}" class-name="title"></x-import>
+            <span style="font-size: 13px; font-weight: 700; color: var(--muted); background: var(--surface-2); border-radius: 999px; padding: 1px 9px">{{col.count}}</span>
+          </div>
+          <p style="margin: 0 4px 6px; font-size: 13px; color: var(--muted)">{{col.blurb}}</p>
+          <sc-for list="{{col.items}}" as="it" hint-placeholder-count="3">
+            <a href="#" class="rm-card">
+              <x-import component-from-global-scope="Lort.VoteSticker" count="{{it.votes}}" default-voted="{{it.voted}}" size="sm" read-only="{{true}}"></x-import>
+              <div style="flex: 1; min-width: 0">
+                <div class="rm-title">{{it.title}}</div>
+                <div class="rm-meta"><span class="rm-pill">{{it.board}}</span><span>{{it.when}}</span></div>
+              </div>
+            </a>
+          </sc-for>
+          <sc-if value="{{col.more}}" hint-placeholder-val="{{false}}">
+            <a href="#" style="margin-top: 4px; padding: 10px 4px; font-size: 14px; font-weight: 600; color: var(--primary-text)">View all 71 shipped →</a>
+          </sc-if>
+        </section>
+      </sc-for>
+    </div>
+
+    <footer style="margin-top: 56px; display: flex; justify-content: center">
+      <a href="#" style="font-size: 13px; color: var(--muted)">Powered by <b style="color: var(--ink)">Lort</b></a>
+    </footer>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      columns: [
+        { status: 'planned', label: 'Planned', count: 4, blurb: 'Committed and up next.', more: false, items: [
+          { title: 'Dark mode for the editor', board: 'Features', votes: 48, voted: true, when: 'Planned 3 weeks ago' },
+          { title: 'Calendar heatmap of my writing streak', board: 'Features', votes: 22, voted: false, when: 'Planned 2 weeks ago' },
+          { title: 'Passcode lock for the app', board: 'Features', votes: 19, voted: false, when: 'Planned last week' },
+          { title: 'Search inside images (OCR)', board: 'Features', votes: 9, voted: false, when: 'Planned 2 days ago' }
+        ]},
+        { status: 'progress', label: 'In progress', count: 2, blurb: 'Being built right now.', more: false, items: [
+          { title: 'Export every entry as Markdown', board: 'Features', votes: 36, voted: true, when: 'Started 4 days ago' },
+          { title: 'Import from Day One', board: 'Features', votes: 17, voted: false, when: 'Started yesterday' }
+        ]},
+        { status: 'completed', label: 'Completed', count: 3, blurb: 'Shipped in the last 30 days.', more: true, items: [
+          { title: 'Tag entries with #hashtags', board: 'Features', votes: 61, voted: true, when: 'Shipped 9 Oct' },
+          { title: 'Photos rotate sideways on Android', board: 'Bugs', votes: 12, voted: false, when: 'Fixed 2 Oct' },
+          { title: 'Reminder at a custom time', board: 'Features', votes: 27, voted: false, when: 'Shipped 24 Sep' }
+        ]}
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

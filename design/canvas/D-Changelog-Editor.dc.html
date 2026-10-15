@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Changelog editor</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/lort/tokens.css">
+<link rel="stylesheet" href="ds/lort/components/bundle.css">
+<script src="ds/lort/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Figtree:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.rail-btn{all:unset;box-sizing:border-box;width:44px;height:44px;border-radius:999px;display:grid;place-items:center;color:var(--muted);cursor:pointer}
+.rail-btn.on{background:var(--surface-2);color:var(--ink)}
+.ed p{margin:0 0 14px;font-size:17px;line-height:28px;color:var(--ink-2)}
+.ed h2{margin:30px 0 10px;font-family:var(--font-display);font-size:24px;line-height:30px;font-weight:800;letter-spacing:-0.02em}
+.ed ul{margin:0 0 14px;padding-left:22px;font-size:17px;line-height:28px;color:var(--ink-2)}
+.ed code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:14px;background:var(--surface-2);border-radius:6px;padding:2px 6px;color:var(--ink)}
+.lbl{all:unset;box-sizing:border-box;cursor:pointer;height:30px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;background:var(--surface-2);color:var(--muted)}
+.lbl[aria-pressed="true"]{background:var(--primary-soft);color:var(--primary-text)}
+.slash-row{display:flex;align-items:center;gap:12px;height:44px;padding:0 10px;border-radius:12px}
+.slash-row.on{background:var(--surface-2)}
+.slash-ico{width:30px;height:30px;border-radius:8px;background:var(--surface-2);display:grid;place-items:center;font-weight:800;font-size:13px;color:var(--ink-2)}
+.slash-row.on .slash-ico{background:var(--surface-3)}
+.pub-row{display:flex;gap:12px;align-items:flex-start;padding:10px;border-radius:12px}
+.pub-row.on{background:var(--surface-2)}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;text-align:center}
+.cal span{height:34px;display:grid;place-items:center;font-size:13px;font-weight:600;border-radius:999px;font-variant-numeric:tabular-nums}
+.cal .dow{height:26px;font-size:11px;font-weight:700;color:var(--muted)}
+.cal .past{color:var(--muted);opacity:.55}
+.cal .today{box-shadow:inset 0 0 0 1.5px var(--dot-empty)}
+.cal .sel{background:var(--primary);color:var(--on-primary)}
+.att{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);--lt-si-ground:var(--surface)}
+</style>
+</helmet>
+<div data-theme="dark" style="position: relative; min-height: 1400px; display: flex; background: var(--ground); color: var(--ink); font-family: var(--font-sans)">
+  <aside aria-label="Dashboard" style="width: 76px; flex: none; padding: 16px 0; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 6px; background: var(--ground-sunken); border-right: 1px solid var(--surface-2)">
+    <span style="width: 30px; height: 30px; border-radius: var(--radius-sm); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 15px; transform: rotate(var(--tilt-mark)); box-shadow: var(--shadow-sticker); margin-bottom: 14px">D</span>
+    <a class="rail-btn" href="#" aria-label="Requests"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM4 13h3l3 3h4l3-3h3"></path></svg></a>
+    <a class="rail-btn" href="#" aria-label="Roadmap"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6M14 4h6M4 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM14 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"></path></svg></a>
+    <a class="rail-btn on" href="#" aria-label="Changelog" aria-current="page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 6h3a1 1 0 0 1 1 1v11a2 2 0 0 1-4 0V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a3 3 0 0 0 3 3h11M8 8h4M8 12h4M8 16h4"></path></svg></a>
+    <div style="flex: 1"></div>
+    <a class="rail-btn" href="#" aria-label="Docs"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13M12 6v13M21 6v13"></path></svg></a>
+    <a class="rail-btn" href="#" aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 6h8M16 6h4M6 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 12h2M10 12h10M15 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 18h11M19 18h1"></path></svg></a>
+  </aside>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+    <div style="height: 64px; display: flex; align-items: center; gap: 14px; padding: 0 28px; border-bottom: 1px solid var(--surface-2)">
+      <a href="#" style="display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--muted)"><span style="display: inline-block; transform: rotate(-90deg)"><x-import component-from-global-scope="Lort.Icon" name="arrowUp" size="{{16}}"></x-import></span>Changelog</a>
+      <span style="font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 5px"><x-import component-from-global-scope="Lort.Icon" name="check" size="{{14}}" stroke-width="{{2.6}}"></x-import>Saved</span>
+      <span style="flex: 1"></span>
+      <label style="display: flex; align-items: center; height: 36px; padding: 0 4px 0 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font-size: 13px; color: var(--muted)">
+        <span>/changelog/</span>
+        <input aria-label="Post address" value="dark-mode-is-here-plus-faster" style="all: unset; width: 230px; color: var(--ink); font-weight: 600; padding-right: 10px">
+      </label>
+      <x-import component-from-global-scope="Lort.Button" variant="ghost">Preview</x-import>
+      <div style="position: relative">
+        <x-import component-from-global-scope="Lort.Button" variant="primary" trailing-icon="chevronDown" aria-expanded="true">Publish</x-import>
+        <div role="menu" aria-label="Publish" style="position: absolute; right: 0; top: 52px; z-index: 30; width: 330px; padding: 8px; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-float)">
+          <div class="pub-row" role="menuitem">
+            <span style="color: var(--muted); margin-top: 2px"><x-import component-from-global-scope="Lort.Icon" name="arrowUp" size="{{18}}"></x-import></span>
+            <span><b style="display: block; font-size: 14px">Publish now</b><span style="font-size: 13px; color: var(--muted)">Goes live and emails 412 verified subscribers.</span></span>
+          </div>
+          <div class="pub-row on" role="menuitem" aria-expanded="true">
+            <span style="color: var(--ink); margin-top: 2px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM16 3v4M8 3v4M4 11h16"></path></svg></span>
+            <span><b style="display: block; font-size: 14px">Schedule…</b><span style="font-size: 13px; color: var(--muted)">Pick a day and time.</span></span>
+          </div>
+          <div style="padding: 10px 8px 4px">
+            <div style="display: flex; align-items: center; margin-bottom: 8px">
+              <b style="flex: 1; font-size: 14px">October 2026</b>
+              <button aria-label="Previous month" style="all: unset; cursor: pointer; width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: var(--muted)"><span style="transform: rotate(-90deg); display: inline-block"><x-import component-from-global-scope="Lort.Icon" name="chevronUp" size="{{16}}"></x-import></span></button>
+              <button aria-label="Next month" style="all: unset; cursor: pointer; width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; color: var(--muted)"><span style="transform: rotate(90deg); display: inline-block"><x-import component-from-global-scope="Lort.Icon" name="chevronUp" size="{{16}}"></x-import></span></button>
+            </div>
+            <div class="cal" role="grid" aria-label="October 2026">
+              <span class="dow">Mo</span><span class="dow">Tu</span><span class="dow">We</span><span class="dow">Th</span><span class="dow">Fr</span><span class="dow">Sa</span><span class="dow">Su</span>
+              <sc-for list="{{days}}" as="d" hint-placeholder-count="35"><span class="{{d.cls}}" aria-selected="{{d.sel}}">{{d.n}}</span></sc-for>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px">
+              <label style="display: flex; align-items: center; gap: 8px; flex: 1; height: 38px; padding: 0 14px; border-radius: 999px; background: var(--ground); border: 1px solid var(--border); font-size: 14px">
+                <span style="color: var(--muted)">At</span><input aria-label="Time" value="09:00" style="all: unset; width: 60px; font-weight: 700; font-variant-numeric: tabular-nums">
+              </label>
+              <x-import component-from-global-scope="Lort.Button" variant="primary" size="sm">Schedule for 21 Oct</x-import>
+            </div>
+          </div>
+          <label style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 10px 6px; margin-top: 6px; border-top: 1px solid var(--border); font-size: 13px; color: var(--ink-2); cursor: pointer">
+            <span class="lt-check" aria-hidden="true" style="background: var(--primary); border-color: var(--primary); color: var(--on-primary); margin-top: 1px"><x-import component-from-global-scope="Lort.Icon" name="check" size="{{12}}" stroke-width="{{3}}"></x-import></span>
+            <span>Also mark the 2 attached requests as Completed when it goes live</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <main style="padding: 40px 32px 80px">
+      <article class="ed" style="max-width: 720px; margin: 0 auto">
+        <button style="all: unset; box-sizing: border-box; cursor: pointer; width: 100%; height: 150px; border-radius: var(--radius-lg); border: 2px dashed var(--dot-empty); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); font-size: 14px; font-weight: 600">
+          <x-import component-from-global-scope="Lort.Icon" name="photo" size="{{24}}"></x-import>Add a cover image
+          <span style="font-size: 12px; font-weight: 500">Also used when the post is shared. Without one, Lort makes a card from the title.</span>
+        </button>
+        <div style="display: flex; gap: 8px; margin: 22px 0 14px" role="group" aria-label="Labels">
+          <button class="lbl" aria-pressed="true">New</button>
+          <button class="lbl" aria-pressed="true">Improved</button>
+          <button class="lbl" aria-pressed="false">Fixed</button>
+        </div>
+        <h1 contenteditable="true" style="margin: 0 0 20px; font-family: var(--font-display); font-weight: 800; font-size: 44px; line-height: 48px; letter-spacing: -0.03em; outline: none">Dark mode is here, plus faster search</h1>
+        <p>You asked for it 48 times, so it’s finally here: Driftnote now has a proper dark theme. It follows your phone’s setting, or you can pick one in Settings → Appearance.</p>
+        <h2>What changed</h2>
+        <ul>
+          <li>Dark theme for the editor, the entry list and the calendar.</li>
+          <li>Search is about 4× faster on journals with more than a thousand entries.</li>
+          <li>Tags now autocomplete as you type <code>#</code>.</li>
+        </ul>
+        <div style="position: relative">
+          <p style="color: var(--muted); margin-bottom: 0"><span style="color: var(--ink)">/</span><span style="display: inline-block; width: 2px; height: 22px; background: var(--ink); vertical-align: -5px; margin-left: 1px"></span> Type / for blocks</p>
+          <div role="listbox" aria-label="Insert a block" style="position: absolute; left: 0; top: 34px; z-index: 20; width: 300px; padding: 6px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-float)">
+            <div class="slash-row on" role="option" aria-selected="true"><span class="slash-ico">H2</span><span><b style="font-size: 14px">Heading</b><span style="display: block; font-size: 12px; color: var(--muted)">A section title</span></span></div>
+            <div class="slash-row" role="option"><span class="slash-ico">•</span><b style="font-size: 14px">Bulleted list</b></div>
+            <div class="slash-row" role="option"><span class="slash-ico">1.</span><b style="font-size: 14px">Numbered list</b></div>
+            <div class="slash-row" role="option"><span class="slash-ico"><x-import component-from-global-scope="Lort.Icon" name="photo" size="{{16}}"></x-import></span><b style="font-size: 14px">Image</b></div>
+            <div class="slash-row" role="option"><span class="slash-ico">“</span><b style="font-size: 14px">Quote</b></div>
+            <div class="slash-row" role="option"><span class="slash-ico" style="font-family: 'JetBrains Mono', monospace">{}</span><b style="font-size: 14px">Code</b></div>
+            <div class="slash-row" role="option"><span class="slash-ico">—</span><b style="font-size: 14px">Divider</b></div>
+          </div>
+        </div>
+
+        <div style="margin-top: 330px; padding-top: 22px; border-top: 1px solid var(--border)">
+          <div style="display: flex; align-items: center; margin-bottom: 12px">
+            <h3 class="title" style="margin: 0; flex: 1; font-size: 18px">Shipped in this update</h3>
+            <x-import component-from-global-scope="Lort.Button" variant="secondary" size="sm" icon="plus">Attach a request</x-import>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div class="att">
+              <x-import component-from-global-scope="Lort.VoteSticker" count="{{48}}" size="sm" read-only="{{true}}"></x-import>
+              <div style="flex: 1; min-width: 0"><b style="font-family: var(--font-display); font-size: 15px">Dark mode for the editor</b>
+                <div style="margin-top: 4px; font-size: 13px; color: var(--muted)"><x-import component-from-global-scope="Lort.StatusIcon" status="planned" show-label="{{true}}" size="{{14}}"></x-import></div></div>
+              <x-import component-from-global-scope="Lort.Button" variant="ghost" size="sm" icon="x" icon-only="{{true}}" aria-label="Detach Dark mode for the editor"></x-import>
+            </div>
+            <div class="att">
+              <x-import component-from-global-scope="Lort.VoteSticker" count="{{12}}" size="sm" read-only="{{true}}"></x-import>
+              <div style="flex: 1; min-width: 0"><b style="font-family: var(--font-display); font-size: 15px">Search is slow with a big journal</b>
+                <div style="margin-top: 4px; font-size: 13px; color: var(--muted)"><x-import component-from-global-scope="Lort.StatusIcon" status="progress" show-label="{{true}}" size="{{14}}"></x-import></div></div>
+              <x-import component-from-global-scope="Lort.Button" variant="ghost" size="sm" icon="x" icon-only="{{true}}" aria-label="Detach Search is slow with a big journal"></x-import>
+            </div>
+          </div>
+        </div>
+      </article>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var days = [{ n: '', cls: '', sel: false }, { n: '', cls: '', sel: false }, { n: '', cls: '', sel: false }];
+    for (var i = 1; i <= 31; i++) {
+      days.push({ n: String(i), sel: i === 21, cls: i === 21 ? 'sel' : i === 15 ? 'today' : i < 15 ? 'past' : '' });
+    }
+    return { days: days };
+  }
+}
+</script>
+</body>
+</html>

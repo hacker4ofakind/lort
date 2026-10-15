@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Changelog post</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/lort/tokens.css">
+<link rel="stylesheet" href="ds/lort/components/bundle.css">
+<script src="ds/lort/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Figtree:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.lb{font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--surface-2);color:var(--ink-2)}
+.lb.new{background:var(--primary-soft);color:var(--primary-text)}
+.post p{margin:0 0 16px;font-size:17px;line-height:28px;color:var(--ink-2)}
+.post h2{margin:34px 0 12px;font-family:var(--font-display);font-size:24px;line-height:30px;font-weight:800;letter-spacing:-0.02em}
+.post ul{margin:0 0 16px;padding-left:22px;font-size:17px;line-height:28px;color:var(--ink-2)}
+.post li{margin-bottom:4px}
+.post code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:14px;background:var(--surface-2);border-radius:6px;padding:2px 6px;color:var(--ink)}
+.post a.inline{color:var(--primary-text);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.shipped{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);--lt-si-ground:var(--surface)}
+.shipped:hover{background:var(--surface-2);--lt-si-ground:var(--surface-2)}
+</style>
+</helmet>
+<div data-theme="dark" style="min-height: 1600px; background: var(--ground); color: var(--ink); font-family: var(--font-sans); padding-bottom: 60px; box-sizing: border-box">
+  <header style="max-width: 1120px; margin: 0 auto; padding: 0 32px; height: 76px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap">
+    <a href="#" style="display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 800; font-size: 19px">
+      <span style="width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-size: 16px; transform: rotate(var(--tilt-mark)); box-shadow: var(--shadow-sticker)">D</span>Driftnote
+    </a>
+    <nav aria-label="Board" style="display: flex; gap: 4px; margin-left: 10px">
+      <a href="#" style="font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-pill); color: var(--muted)">Feedback</a>
+      <a href="#" style="font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-pill); color: var(--muted)">Roadmap</a>
+      <a href="#" aria-current="page" style="font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-pill); background: var(--surface-2)">Changelog</a>
+    </nav>
+    <div style="flex: 1"></div>
+    <label style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: var(--radius-pill); background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 240px; box-sizing: border-box">
+      <x-import component-from-global-scope="Lort.Icon" name="search" size="{{16}}"></x-import>
+      <input type="search" placeholder="Search ideas" aria-label="Search ideas" style="all: unset; flex: 1; font-size: 14px; color: var(--ink)">
+    </label>
+    <x-import component-from-global-scope="Lort.Avatar" name="Luk" size="{{38}}" keyline="{{true}}"></x-import>
+  </header>
+
+  <main style="max-width: 760px; margin: 0 auto; padding: 24px 32px 0; box-sizing: border-box">
+    <a href="#" style="display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 26px">
+      <span style="display: inline-block; transform: rotate(-90deg)"><x-import component-from-global-scope="Lort.Icon" name="arrowUp" size="{{16}}"></x-import></span>Changelog
+    </a>
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px">
+      <span style="font-size: 14px; font-weight: 700">9 October 2026</span>
+      <span class="lb new">New</span>
+    </div>
+    <h1 class="display-l" style="margin: 0; font-size: 44px; line-height: 48px; text-wrap: balance">Tag anything with #hashtags</h1>
+    <div role="img" aria-label="Cover image" style="margin: 28px 0 30px; height: 300px; border-radius: var(--radius-xl); background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: 14px; font-weight: 600">
+      <x-import component-from-global-scope="Lort.Icon" name="photo" size="{{28}}"></x-import>Cover image
+    </div>
+    <article class="post">
+      <p>You asked for this 61 times, more than anything else on the board. Starting today, typing <code>#work</code>, <code>#travel</code> or any other word with a <code>#</code> in front turns it into a tag.</p>
+      <h2>How it works</h2>
+      <ul>
+        <li>Tags appear in the sidebar under your journals, with a count next to each.</li>
+        <li>Tap a tag to see every entry that uses it, newest first.</li>
+        <li>Rename a tag once and every entry updates.</li>
+      </ul>
+      <p>Your old entries are tagged too: Driftnote scanned them for hashtags when the update installed, so nothing to do on your side.</p>
+      <h2>What’s next</h2>
+      <p>Dark mode is <a class="inline" href="#">on the roadmap</a> and coming soon. Keep the suggestions coming.</p>
+    </article>
+
+    <section aria-label="Shipped in this update" style="margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--border)">
+      <h2 class="title" style="margin: 0 0 12px; font-size: 18px">Shipped in this update</h2>
+      <a href="#" class="shipped">
+        <x-import component-from-global-scope="Lort.VoteSticker" count="{{61}}" size="sm" read-only="{{true}}" default-voted="{{true}}"></x-import>
+        <div style="flex: 1; min-width: 0">
+          <b style="font-family: var(--font-display); font-size: 15px">Tag entries with #hashtags</b>
+          <div style="margin-top: 4px; font-size: 13px; color: var(--muted)"><x-import component-from-global-scope="Lort.StatusIcon" status="completed" show-label="{{true}}" size="{{14}}"></x-import></div>
+        </div>
+        <span style="font-size: 13px; color: var(--muted)">Suggested by Ade O.</span>
+      </a>
+    </section>
+
+    <div style="display: flex; justify-content: center; margin-top: 40px">
+      <x-import component-from-global-scope="Lort.Button" variant="secondary">Share this update</x-import>
+    </div>
+
+    <footer style="margin-top: 48px; display: flex; justify-content: center">
+      <a href="#" style="font-size: 13px; color: var(--muted)">Powered by <b style="color: var(--ink)">Lort</b></a>
+    </footer>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1600}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

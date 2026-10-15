@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Public changelog</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/lort/tokens.css">
+<link rel="stylesheet" href="ds/lort/components/bundle.css">
+<script src="ds/lort/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.lb{font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--surface-2);color:var(--ink-2)}
+.lb.new{background:var(--primary-soft);color:var(--primary-text)}
+.entry{display:grid;grid-template-columns:150px minmax(0,1fr);gap:28px;padding:28px 0;border-top:1px solid var(--border)}
+.entry:hover .entry-title{color:var(--primary-text)}
+.filt{all:unset;cursor:pointer;height:34px;padding:0 14px;border-radius:999px;font-size:14px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center}
+.filt[aria-pressed="true"]{background:var(--ink);color:var(--ground)}
+.filt:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+</style>
+</helmet>
+<div data-theme="dark" style="min-height: 1100px; background: var(--ground); color: var(--ink); font-family: var(--font-sans); padding-bottom: 60px; box-sizing: border-box">
+  <header style="max-width: 1120px; margin: 0 auto; padding: 0 32px; height: 76px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap">
+    <a href="#" style="display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 800; font-size: 19px">
+      <span style="width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-size: 16px; transform: rotate(var(--tilt-mark)); box-shadow: var(--shadow-sticker)">D</span>Driftnote
+    </a>
+    <nav aria-label="Board" style="display: flex; gap: 4px; margin-left: 10px">
+      <a href="#" style="font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-pill); color: var(--muted)">Feedback</a>
+      <a href="#" style="font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-pill); color: var(--muted)">Roadmap</a>
+      <a href="#" aria-current="page" style="font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-pill); background: var(--surface-2)">Changelog</a>
+    </nav>
+    <div style="flex: 1"></div>
+    <label style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: var(--radius-pill); background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 240px; box-sizing: border-box">
+      <x-import component-from-global-scope="Lort.Icon" name="search" size="{{16}}"></x-import>
+      <input type="search" placeholder="Search ideas" aria-label="Search ideas" style="all: unset; flex: 1; font-size: 14px; color: var(--ink)">
+    </label>
+    <x-import component-from-global-scope="Lort.Avatar" name="Luk" size="{{38}}" keyline="{{true}}"></x-import>
+  </header>
+
+  <main style="max-width: 860px; margin: 0 auto; padding: 36px 32px 0; box-sizing: border-box">
+    <h1 class="display-xl" style="margin: 0">What’s new in Driftnote</h1>
+    <p class="body-lg" style="margin: 12px 0 26px; color: var(--ink-2)">Everything the team shipped, newest first. Sign in with a verified email to get these in your inbox.</p>
+    <div role="group" aria-label="Filter by label" style="display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--ground); border: 1px solid var(--border); box-shadow: var(--shadow-inset-sm); margin-bottom: 8px">
+      <button class="filt" aria-pressed="true">All</button><button class="filt" aria-pressed="false">New</button><button class="filt" aria-pressed="false">Improved</button><button class="filt" aria-pressed="false">Fixed</button>
+    </div>
+
+    <sc-for list="{{posts}}" as="p" hint-placeholder-count="5">
+      <a href="#" class="entry">
+        <div style="padding-top: 4px">
+          <div style="font-weight: 700; font-size: 14px">{{p.date}}</div>
+          <div style="font-size: 13px; color: var(--muted); margin-top: 2px">{{p.year}}</div>
+        </div>
+        <div style="min-width: 0">
+          <div style="display: flex; gap: 6px; margin-bottom: 10px"><sc-for list="{{p.labels}}" as="l" hint-placeholder-count="1"><span class="lb {{l.cls}}">{{l.name}}</span></sc-for></div>
+          <h2 class="entry-title" style="margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 26px; line-height: 31px; letter-spacing: -0.02em; text-wrap: balance">{{p.title}}</h2>
+          <p class="body" style="margin: 8px 0 0; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden">{{p.body}}</p>
+        </div>
+      </a>
+    </sc-for>
+
+    <footer style="margin-top: 40px; display: flex; justify-content: center">
+      <a href="#" style="font-size: 13px; color: var(--muted)">Powered by <b style="color: var(--ink)">Lort</b></a>
+    </footer>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    function L(names) { return names.map(function (n) { return { name: n, cls: n === 'New' ? 'new' : '' }; }); }
+    return {
+      posts: [
+        { date: '9 Oct', year: '2026', labels: L(['New']), title: 'Tag anything with #hashtags', body: 'Type #work, #travel or anything else anywhere in an entry and it becomes a tag. Tags show up in the sidebar, so you can filter your whole journal in one tap.' },
+        { date: '2 Oct', year: '2026', labels: L(['Fixed']), title: 'Photos no longer rotate sideways on Android', body: 'Pictures taken in portrait on some Samsung and Pixel phones were saved on their side. They now keep the orientation you took them in, including old ones.' },
+        { date: '24 Sep', year: '2026', labels: L(['New']), title: 'Reminders at any time you like', body: 'The daily writing reminder used to be stuck at 9 pm. Now you can pick any time, or two times, and skip weekends if you want to.' },
+        { date: '11 Sep', year: '2026', labels: L(['Improved']), title: 'A faster, calmer editor', body: 'The editor opens twice as fast, the toolbar hides while you type, and long entries no longer stutter when you scroll back up.' },
+        { date: '1 Sep', year: '2026', labels: L(['New']), title: 'Welcome to the Driftnote changelog', body: 'This is where we’ll post everything we ship, big or small. Suggest what we should build next on the feedback board.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

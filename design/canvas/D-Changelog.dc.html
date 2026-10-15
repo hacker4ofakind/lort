@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dashboard changelog list</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/lort/tokens.css">
+<link rel="stylesheet" href="ds/lort/components/bundle.css">
+<script src="ds/lort/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.side-item{display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;border-radius:999px;font-size:15px;font-weight:600;color:var(--muted)}
+.side-item.on{background:var(--surface-2);color:var(--ink)}
+.cl-row{display:grid;grid-template-columns:minmax(0,1fr) 190px 210px 90px 30px;align-items:center;gap:16px;height:60px;padding:0 20px;border-top:1px solid var(--border)}
+.cl-row:hover{background:var(--surface-2)}
+.cl-head{height:40px;border-top:none;font-size:12px;font-weight:700;color:var(--muted)}
+.cl-head:hover{background:none}
+.cl-title{font-family:var(--font-display);font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cl-label{font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:var(--surface-2);color:var(--ink-2)}
+.cl-label.new{background:var(--primary-soft);color:var(--primary-text)}
+.cl-row:hover .cl-label:not(.new){background:var(--surface-3)}
+.cl-state{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.cl-dot{width:8px;height:8px;border-radius:50%}
+</style>
+</helmet>
+<div data-theme="dark" style="min-height: 900px; display: flex; background: var(--ground); color: var(--ink); font-family: var(--font-sans)">
+  <aside aria-label="Dashboard" style="width: 244px; flex: none; padding: 16px 12px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; background: var(--ground-sunken); border-right: 1px solid var(--surface-2)">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px">
+      <span style="width: 30px; height: 30px; border-radius: var(--radius-sm); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 15px; transform: rotate(var(--tilt-mark)); box-shadow: var(--shadow-sticker)">D</span>
+      <span style="font-family: var(--font-display); font-weight: 800; font-size: 17px; flex: 1">Driftnote</span>
+      <button aria-label="Collapse sidebar" style="all: unset; cursor: pointer; width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; color: var(--muted)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 4v16M15 10l-2 2l2 2"></path></svg></button>
+    </div>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM4 13h3l3 3h4l3-3h3"></path></svg>Requests<span style="margin-left: auto; font-size: 12px; font-weight: 700; background: var(--primary); color: var(--on-primary); border-radius: 999px; padding: 1px 8px">3 new</span></a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6M14 4h6M4 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM14 10a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"></path></svg>Roadmap</a>
+    <a class="side-item on" href="#" aria-current="page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 6h3a1 1 0 0 1 1 1v11a2 2 0 0 1-4 0V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a3 3 0 0 0 3 3h11M8 8h4M8 12h4M8 16h4"></path></svg>Changelog</a>
+    <div style="flex: 1"></div>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0M3 6v13M12 6v13M21 6v13"></path></svg>Docs</a>
+    <a class="side-item" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 6h8M16 6h4M6 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 12h2M10 12h10M15 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 18h11M19 18h1"></path></svg>Settings</a>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 12px 8px 2px">
+      <x-import component-from-global-scope="Lort.Avatar" name="Luk" size="{{28}}" team="{{true}}"></x-import>
+      <span style="font-size: 13px; font-weight: 600; flex: 1">Luk</span>
+      <span style="font-size: 11px; color: var(--muted)">Lort 1.0</span>
+    </div>
+  </aside>
+
+  <main style="flex: 1; min-width: 0; padding: 30px 40px 60px; box-sizing: border-box">
+    <div style="max-width: 1060px; margin: 0 auto">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <h1 style="margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 30px; letter-spacing: -0.025em">Changelog</h1>
+        <span style="font-size: 14px; color: var(--muted); margin-top: 6px">Tell people what you shipped. Verified users get an email when you publish.</span>
+        <span style="flex: 1"></span>
+        <x-import component-from-global-scope="Lort.Button" variant="primary" icon="plus">New post</x-import>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px; margin: 22px 0 16px; flex-wrap: wrap">
+        <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 16px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 280px; box-sizing: border-box">
+          <x-import component-from-global-scope="Lort.Icon" name="search" size="{{16}}"></x-import>
+          <input type="search" placeholder="Search posts" aria-label="Search posts" style="all: unset; flex: 1; font-size: 14px; color: var(--ink)">
+        </label>
+        <x-import component-from-global-scope="Lort.FilterMenu" all-label="Any state" noun="states" options="{{stateOptions}}" placement="down"></x-import>
+        <x-import component-from-global-scope="Lort.FilterMenu" all-label="Any label" noun="labels" options="{{labelOptions}}" placement="down"></x-import>
+      </div>
+
+      <div role="table" aria-label="Changelog posts" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden">
+        <div role="row" class="cl-row cl-head">
+          <span role="columnheader">Post</span>
+          <span role="columnheader">Labels</span>
+          <span role="columnheader">State</span>
+          <span role="columnheader">Requests</span>
+          <span role="columnheader"><span style="position: absolute; left: -9999px">Author</span></span>
+        </div>
+        <sc-for list="{{posts}}" as="p" hint-placeholder-count="7">
+          <a role="row" href="#" class="cl-row">
+            <span role="cell" class="cl-title">{{p.title}}</span>
+            <span role="cell" style="display: flex; gap: 6px"><sc-for list="{{p.labels}}" as="l" hint-placeholder-count="1"><span class="cl-label {{l.cls}}">{{l.name}}</span></sc-for></span>
+            <span role="cell" class="cl-state"><span class="cl-dot" style="background: {{p.dot}}"></span><span style="color: {{p.ink}}">{{p.state}}</span></span>
+            <span role="cell" style="font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums">{{p.reqs}}</span>
+            <span role="cell"><x-import component-from-global-scope="Lort.Avatar" name="Luk" size="{{26}}"></x-import></span>
+          </a>
+        </sc-for>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    function L(names) { return names.map(function (n) { return { name: n, cls: n === 'New' ? 'new' : '' }; }); }
+    var published = { dot: 'var(--primary)', ink: 'var(--ink)' };
+    var scheduled = { dot: 'var(--ink-2)', ink: 'var(--ink-2)' };
+    var draft = { dot: 'transparent; box-shadow: inset 0 0 0 2px var(--dot-empty)', ink: 'var(--muted)' };
+    function P(title, labels, state, kind, reqs) { return Object.assign({ title: title, labels: L(labels), state: state, reqs: reqs }, kind); }
+    return {
+      posts: [
+        P('Dark mode is here, plus faster search', ['New', 'Improved'], 'Draft · edited 2 min ago', draft, '2 attached'),
+        P('Markdown export and a fix for sync conflicts', ['New', 'Fixed'], 'Scheduled · 21 Oct, 09:00', scheduled, '2 attached'),
+        P('Tag anything with #hashtags', ['New'], 'Published · 9 Oct', published, '1 attached'),
+        P('Photos no longer rotate sideways on Android', ['Fixed'], 'Published · 2 Oct', published, '1 attached'),
+        P('Reminders at any time you like', ['New'], 'Published · 24 Sep', published, '1 attached'),
+        P('A faster, calmer editor', ['Improved'], 'Published · 11 Sep', published, 'None'),
+        P('Welcome to the Driftnote changelog', ['New'], 'Published · 1 Sep', published, 'None')
+      ],
+      stateOptions: [{ value: 'draft', label: 'Draft' }, { value: 'scheduled', label: 'Scheduled' }, { value: 'published', label: 'Published' }],
+      labelOptions: [{ value: 'new', label: 'New' }, { value: 'improved', label: 'Improved' }, { value: 'fixed', label: 'Fixed' }]
+    };
+  }
+}
+</script>
+</body>
+</html>

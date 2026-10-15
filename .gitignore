@@ -1,0 +1,7 @@
+# Impeccable decision-round scratch (rolls, question payloads)
+.impeccable/questions/
+.impeccable/live/
+
+# Local Lort server data and binary
+server/pb_data/
+server/lort

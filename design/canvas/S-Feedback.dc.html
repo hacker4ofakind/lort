@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Feedback board loading</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/lort/tokens.css">
+<link rel="stylesheet" href="ds/lort/components/bundle.css">
+<script src="ds/lort/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.sk{background:var(--surface-2);border-radius:999px;animation:sk-pulse 1.6s ease-in-out infinite}
+@keyframes sk-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){.sk{animation:none}}
+.sk-card{display:flex;gap:18px;align-items:flex-start;padding:20px 22px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg)}
+</style>
+</helmet>
+<div data-theme="dark" aria-busy="true" style="position: relative; height: 1040px; overflow: hidden; background: var(--ground); color: var(--ink); font-family: var(--font-sans)">
+  <header style="max-width: 1120px; margin: 0 auto; padding: 0 32px; height: 76px; display: flex; align-items: center; gap: 20px">
+    <a href="#" style="display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 800; font-size: 19px">
+      <span style="width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-size: 16px; transform: rotate(var(--tilt-mark)); box-shadow: var(--shadow-sticker)">D</span>Driftnote
+    </a>
+    <nav aria-label="Board" style="display: flex; gap: 4px; margin-left: 10px">
+      <a href="#" aria-current="page" style="font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-pill); background: var(--surface-2)">Feedback</a>
+      <a href="#" style="font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-pill); color: var(--muted)">Roadmap</a>
+      <a href="#" style="font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius-pill); color: var(--muted)">Changelog</a>
+    </nav>
+    <div style="flex: 1"></div>
+    <div class="sk" style="width: 240px; height: 40px"></div>
+    <div class="sk" style="width: 38px; height: 38px"></div>
+  </header>
+  <main style="max-width: 860px; margin: 0 auto; padding: 44px 32px 0; box-sizing: border-box">
+    <div class="sk" style="width: 62%; height: 40px; border-radius: 14px"></div>
+    <div class="sk" style="width: 78%; height: 16px; margin-top: 18px"></div>
+    <div class="sk" style="width: 40%; height: 16px; margin-top: 10px; margin-bottom: 34px"></div>
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <sc-for list="{{cards}}" as="c" hint-placeholder-count="5">
+        <div class="sk-card">
+          <div class="sk" style="width: 58px; height: 58px; flex: none"></div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; padding-top: 4px">
+            <div class="sk" style="width: {{c.t}}; height: 20px; border-radius: 8px"></div>
+            <div class="sk" style="width: 96%; height: 13px"></div>
+            <div class="sk" style="width: {{c.b}}; height: 13px"></div>
+            <div style="display: flex; gap: 10px; margin-top: 6px"><div class="sk" style="width: 92px; height: 20px"></div><div class="sk" style="width: 70px; height: 20px"></div><div class="sk" style="width: 84px; height: 20px"></div></div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+  <div style="position: absolute; left: 0; right: 0; bottom: 28px; display: flex; justify-content: center">
+    <x-import component-from-global-scope="Lort.FloatingBar" boards="{{boards}}" hint-size="640px,58px"></x-import>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      boards: ['Features', 'Bugs'],
+      cards: [{ t: '46%', b: '70%' }, { t: '58%', b: '52%' }, { t: '38%', b: '80%' }, { t: '64%', b: '44%' }, { t: '50%', b: '66%' }]
+    };
+  }
+}
+</script>
+</body>
+</html>
