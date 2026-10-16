@@ -76,13 +76,13 @@ The Go binary starts Next, restarts it with backoff if it exits, and forwards SI
 | Path | Handler |
 |---|---|
 | `/api/*` (PocketBase REST, realtime SSE, files) | PocketBase |
-| `/api/lort/*` | Lort's custom Go endpoints (vote, triage, merge, transcribe, publish, similar, widget config, health) |
+| `/api/lort/*` | Lort's custom Go endpoints (config, the request page, vote, triage, merge, board moves, dashboard stats, transcribe, publish, similar, widget config, health) |
 | `/mcp` | MCP server |
 | `/widget.js` | Embeddable widget script (served by Go, cached) |
 | `/_/` | PocketBase admin UI: disabled unless `LORT_PB_ADMIN=1` |
-| everything else | Next.js |
+| everything else | Next.js, with an `X-Lort-Config` header carrying the brand |
 
-Next renders server components against PocketBase on the internal address and the browser talks to the same origin with the PocketBase JS SDK. Business rules (status transitions, vote counting, merges, email and webhook fan-out) live in Go, behind `/api/lort/*` or PocketBase hooks, never in Next.
+The proxy always replaces `X-Lort-Config` (base64 JSON: app name, logo, primary colour, the landing-card and public-roadmap switches, and which features are on), so server components render the owner's brand on the first paint without asking PocketBase, and a visitor can't forge it. The browser talks to the same origin with the PocketBase JS SDK: the record API (guarded by hooks) to create requests and comments with images, and `/api/lort/*` for everything with business rules. `GET /api/lort/requests/{id}` returns a request page in one response (request, images, merge target, timeline and comment `thread`), with visibility and internal notes decided in Go from the caller's token. Business rules (status transitions, vote counting, merges, email and webhook fan-out) live in Go, behind `/api/lort/*` or PocketBase hooks, never in Next.
 
 ### 2.3 Repo layout
 ```
@@ -221,17 +221,17 @@ Signed-in, non-banned users can comment and reply (one level). Authors can delet
 `<script src="https://feedback.yoursite.com/widget.js" async></script>` adds a floating "Feedback" button (or binds to any element with `data-lort-feedback`). It opens an iframe modal containing the Suggest something form, with sign-in inside the iframe using `Partitioned` (CHIPS) cookies. After submitting, the widget links to the request on the board. The widget never shows the "Get your own board" card. No SSO.
 
 ### 5.6 Freshness
-Lists subscribe to PocketBase realtime (SSE). New requests appear at the top with a `primary-soft` tint that fades. A manual refresh button is rate-limited to once per 10 seconds. If the SSE connection drops, the page polls every 3 minutes until it reconnects.
+Lists subscribe to PocketBase realtime (SSE). New requests appear at the top with a `primary-soft` tint that fades. If the SSE connection drops, the page polls every 3 minutes until it reconnects. The dashboard's requests table also has a manual refresh button, rate-limited to once per 10 seconds; the public board relies on realtime alone.
 
 ### 5.7 Anti-spam
 Always on: per-IP and per-user rate limits (sign-up, request creation, comments, votes, transcription) returning 429 with a friendly toast, and a hidden honeypot field on sign-up and suggest. Optional: Cloudflare Turnstile (invisible) at sign-up.
 
 ## 6. Dashboard (`/dashboard`)
 
-Sign-in is for superusers only. The sidebar has Requests (with an "N new" badge), Roadmap, Changelog, then Docs and Settings at the bottom, then the signed-in admin with the Lort version. It collapses to a 76px icon rail (remembered per browser). Below 768px the sidebar becomes a top bar with a menu sheet.
+Sign-in is for superusers only. The sidebar has Requests (with an "N new" badge), Roadmap, Changelog, then View the board (opens `/feedback` in a new tab), Docs and Settings at the bottom, then the signed-in admin with the Lort version. A dashboard session also signs the admin in on the board as their linked team profile (renewed on each visit, so their comments carry the Team badge); it ends only when the server refuses the session, never because a request was cut short. It collapses to a 76px icon rail (remembered per browser). Below 768px the sidebar becomes a top bar with a menu sheet.
 
 ### 6.1 Requests (`/dashboard/requests`)
-- Header: title, "142 total · 38 waiting for you" (waiting = Pending + Reviewing), a Live indicator, refresh button, and "New request" (admin creates a request, optionally on behalf of an email).
+- Header: title, "142 total · 38 waiting for you" (waiting = Pending + Reviewing), a Live indicator, refresh button, and "New request" (opens Suggest something as the admin's board profile; creating one on behalf of an email arrives with email in phase 3). The counts come from `GET /api/lort/stats`, which leaves merged requests out.
 - Filters (all in the URL): search, Status (defaults to the four open statuses, summarised "Open"), Board, Tags, Visibility (On the board / Hidden), and sort (Newest, Oldest, Most upvoted, Recently updated).
 - Table columns: status (icon only, with tooltip and `aria-label`), request title with "New" and "Hidden" markers, votes, tags, date, requested by. Rows the team has not opened yet have the `primary-soft` tint and count toward the sidebar badge; opening a request sets `teamSeenAt`.
 - Infinite scroll; realtime inserts; the rate-limited refresh button.
@@ -239,7 +239,7 @@ Sign-in is for superusers only. The sidebar has Requests (with an "N new" badge)
 ### 6.2 Request (`/dashboard/requests/<id>`)
 The same layout as the public request page, plus:
 - Breadcrumb "Requests / <Board>" and "3 of 12 in Reviewing" for the current queue.
-- Editable chips: status (opens a menu), board, tags, "add tag", and the "On the board" visibility switch.
+- Editable chips: status (opens a menu), board (moved through `POST /api/lort/requests/{id}/board`, which adds a "board changed" timeline entry), tags, "add tag", and the "On the board" visibility switch.
 - Composer with the Public/Internal toggle, images and mic.
 - Timeline with status changes, internal notes (note style, "Only the team sees this") and threaded comments.
 - Avatar popovers with email, join date, request and vote counts, verification state, **Copy password reset link** (works without email) and **Ban**/Unban.
@@ -405,7 +405,7 @@ whisper.cpp with the q5 quantised large-v3-turbo model. The model downloads to `
 - **Go unit tests:** status transitions and triage rules, merge (vote moving and dedupe), trending score, slug generation and stability, HMAC signing, job queue (scheduling, cancel/undo, retry, crash recovery), email gating (7-day rule, opt-outs, email off), webhook threshold firing once.
 - **Go integration tests** against a PocketBase test app: API rules, `/api/lort/*` endpoints, MCP tools per scope (read keys cannot call full tools, human-only tools absent).
 - **Vitest:** frontend logic (filters to URL, optimistic vote, primary colour contrast adjustment, composer limits).
-- **Playwright e2e:** sign up, suggest with similar suggestions, vote, comment, triage through every status with undo, roadmap drag with mouse and keyboard, changelog draft → schedule → publish, settings toggles hide features. Run in both themes; axe checks on every page.
+- **Playwright e2e:** sign up, suggest with similar suggestions, vote, comment, triage through every status with undo, roadmap drag with mouse and keyboard, changelog draft → schedule → publish, settings toggles hide features. Run in both themes; axe checks on every page. The suite runs against the real stack: `web/e2e/start.sh` builds the Go server and the Next.js standalone output and starts `lort` on a throwaway data directory, and global setup seeds boards and tags and turns Lort's rate limits off (the suite signs up more people per minute than one IP is allowed).
 - **CI:** builds the image, runs the Go and web tests, Playwright against the built container, `shellcheck setup.sh` and `PSScriptAnalyzer` on `setup.ps1`.
 
 ## 13. Build phases

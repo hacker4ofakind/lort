@@ -288,6 +288,7 @@ Pills for everything clickable (buttons, chips, tabs, inputs, nav, floating bars
 ## Components
 
 React 18 + TypeScript source for each lives in `design/components/src/` (styles in `design/components/lort.css`, classes prefixed `lt-`); copy them into the Next.js app as client components. The design system artifact has a live, interactive preview and usage notes for each.
+In the app (`web/components/lort`), build conditional class lists with `cx()` rather than template strings, which the Prettier Tailwind plugin trims. `Button` with `iconOnly` renders only its `icon` prop: for an icon-only button with a Tabler icon, use a plain `<button className="lt-btn lt-btn-ghost lt-btn-icon">` with an `aria-label`. A Radix menu trigger needs a component that forwards its ref and props, so chips that open menus use the app's `ChipButton`, styled like `Chip`.
 - **StatusIcon:** 16px circle; 1.5px ring in the status colour, 30% tint inside, solid fill rising from the bottom (0 / 28 / 50 / 80 / 100%), check for Completed, cross for Closed.
 - **VoteSticker:** 58px (40px compact). Empty: 2px dashed Dot Spot ring. Voted: primary fill, 3px keyline, −7° tilt, sticker shadow. The signature motion: slap on (scale 1.15 → 1 and rotate to −7° over ~220ms, springy) and peel off (160ms). Instant under reduced motion.
 - **Button:** primary / secondary / ghost / danger-text pills, 42px (32px small). One primary per view; no filled red buttons.
