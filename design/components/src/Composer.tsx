@@ -45,18 +45,15 @@ export function Composer({
   const [text, setText] = React.useState('');
   const [visibility, setVisibility] = React.useState<Visibility>('public');
   const [images, setImages] = React.useState<File[]>([]);
-  const [previews, setPreviews] = React.useState<string[]>([]);
   const [error, setError] = React.useState('');
   const [recording, setRecording] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const fieldId = React.useId();
 
-  React.useEffect(() => {
-    const urls = images.map((f) => URL.createObjectURL(f));
-    setPreviews(urls);
-    return () => urls.forEach((u) => URL.revokeObjectURL(u));
-  }, [images]);
+  // Object URLs for the thumbnails, released when the images change or the composer goes away.
+  const previews = React.useMemo(() => images.map((f) => URL.createObjectURL(f)), [images]);
+  React.useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
 
   const addFiles = (list: FileList | null) => {
     if (!list || pending) return;

@@ -58,7 +58,7 @@ func main() {
 			})
 		}
 		api.Register(se, api.Deps{Svc: svc, Cfg: cfg})
-		se.Router.Any("/{path...}", web.Proxy(webURL))
+		se.Router.Any("/{path...}", web.Proxy(webURL, func() string { return api.BrandHeader(se.App) }))
 
 		if len(cfg.WebCmd) > 0 {
 			ctx, cancel := context.WithCancel(context.Background())

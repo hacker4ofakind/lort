@@ -33,6 +33,33 @@ func Register(app core.App, svc *requests.Service) {
 			return svc.Recount(tx, e.Record.GetString("request"))
 		})
 	})
+	app.OnRecordDeleteExecute("comments").BindFunc(deleteReplies)
+}
+
+// deleteReplies removes a top-level comment's replies along with it. `parent` is a plain text
+// field, so nothing else would: the replies would vanish from the page but still be counted.
+func deleteReplies(e *core.RecordEvent) error {
+	if e.Record.GetString("parent") != "" {
+		return e.Next()
+	}
+	original := e.App
+	defer func() { e.App = original }()
+	return e.App.RunInTransaction(func(tx core.App) error {
+		e.App = tx
+		if err := e.Next(); err != nil {
+			return err
+		}
+		replies, err := tx.FindAllRecords("comments", dbx.HashExp{"parent": e.Record.Id})
+		if err != nil {
+			return err
+		}
+		for _, r := range replies {
+			if err := tx.Delete(r); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // honeypot rejects requests whose hidden "website" field was filled in (bots fill every field).

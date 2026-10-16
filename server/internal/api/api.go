@@ -2,6 +2,8 @@
 package api
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -29,6 +31,7 @@ func Register(se *core.ServeEvent, d Deps) {
 	})
 	g.GET("/config", d.config)
 	g.GET("/requests", d.list)
+	g.GET("/requests/{id}", d.get)
 	g.GET("/similar", d.similar)
 	g.POST("/requests/{id}/vote", d.vote).Bind(apis.RequireAuth("users"))
 
@@ -37,6 +40,8 @@ func Register(se *core.ServeEvent, d Deps) {
 	team.POST("/requests/{id}/undo", d.undo)
 	team.POST("/requests/{id}/merge", d.merge)
 	team.POST("/requests/{id}/seen", d.seen)
+	team.POST("/requests/{id}/board", d.moveBoard)
+	team.GET("/stats", d.stats)
 	team.GET("/team", d.teamList)
 	team.GET("/team/me", d.teamMe)
 	team.POST("/team/invite", d.teamInvite)
@@ -52,7 +57,7 @@ func fail(e *core.RequestEvent, err error) error {
 	case errors.Is(err, requests.ErrNotFound):
 		return e.NotFoundError("That request is gone.", nil)
 	case errors.Is(err, requests.ErrNotVoting), errors.Is(err, requests.ErrUndoGone),
-		errors.Is(err, requests.ErrBadMerge), errors.Is(err, team.ErrRemoveSelf), errors.Is(err, team.ErrLastAdmin):
+		errors.Is(err, requests.ErrBadMerge), errors.Is(err, requests.ErrNoBoard), errors.Is(err, team.ErrRemoveSelf), errors.Is(err, team.ErrLastAdmin):
 		return e.BadRequestError(err.Error(), nil)
 	default:
 		return e.BadRequestError(err.Error(), nil)
@@ -64,14 +69,53 @@ func actor(e *core.RequestEvent) (*core.Record, error) {
 	return team.Profile(e.App, e.Auth)
 }
 
-func (d Deps) config(e *core.RequestEvent) error {
-	settings, err := e.App.FindFirstRecordByFilter("settings", "")
+// Brand is what every page needs before it renders: the owner's branding and which
+// optional features are on. The proxy also hands it to Next.js in the X-Lort-Config header.
+type Brand struct {
+	AppName         string          `json:"appName"`
+	Logo            string          `json:"logo"`
+	PrimaryColor    string          `json:"primaryColor"`
+	ShowLandingCard bool            `json:"showLandingCard"`
+	RoadmapPublic   bool            `json:"roadmapPublic"`
+	Features        map[string]bool `json:"features"`
+}
+
+func LoadBrand(app core.App) (Brand, error) {
+	settings, err := app.FindFirstRecordByFilter("settings", "")
 	if err != nil {
-		return err
+		return Brand{}, err
 	}
 	logo := ""
 	if f := settings.GetString("logo"); f != "" {
 		logo = "/api/files/settings/" + settings.Id + "/" + f
+	}
+	return Brand{
+		AppName:         settings.GetString("appName"),
+		Logo:            logo,
+		PrimaryColor:    settings.GetString("primaryColor"),
+		ShowLandingCard: settings.GetBool("showLandingCard"),
+		RoadmapPublic:   settings.GetBool("roadmapPublic"),
+		Features:        map[string]bool{"email": false, "voice": false, "turnstile": false},
+	}, nil
+}
+
+// BrandHeader is the brand as base64 JSON for the X-Lort-Config header, or "" if it can't be read.
+func BrandHeader(app core.App) string {
+	b, err := LoadBrand(app)
+	if err != nil {
+		return ""
+	}
+	raw, err := json.Marshal(b)
+	if err != nil {
+		return ""
+	}
+	return base64.StdEncoding.EncodeToString(raw)
+}
+
+func (d Deps) config(e *core.RequestEvent) error {
+	brand, err := LoadBrand(e.App)
+	if err != nil {
+		return err
 	}
 	boards, err := e.App.FindRecordsByFilter("boards", "isPublic = true", "order", 0, 0)
 	if err != nil {
@@ -92,16 +136,11 @@ func (d Deps) config(e *core.RequestEvent) error {
 		}
 		return out
 	}
-	return e.JSON(http.StatusOK, map[string]any{
-		"appName":         settings.GetString("appName"),
-		"logo":            logo,
-		"primaryColor":    settings.GetString("primaryColor"),
-		"showLandingCard": settings.GetBool("showLandingCard"),
-		"roadmapPublic":   settings.GetBool("roadmapPublic"),
-		"boards":          toRefs(boards),
-		"tags":            toRefs(tags),
-		"features":        map[string]bool{"email": false, "voice": false, "turnstile": false},
-	})
+	return e.JSON(http.StatusOK, struct {
+		Brand
+		Boards []ref `json:"boards"`
+		Tags   []ref `json:"tags"`
+	}{brand, toRefs(boards), toRefs(tags)})
 }
 
 func csv(v string) []string {
@@ -111,14 +150,19 @@ func csv(v string) []string {
 	return strings.Split(v, ",")
 }
 
+// viewer is the signed-in board user, or nil for visitors and superusers.
+func viewer(e *core.RequestEvent) *core.Record {
+	if e.Auth != nil && e.Auth.Collection().Name == "users" {
+		return e.Auth
+	}
+	return nil
+}
+
 func (d Deps) list(e *core.RequestEvent) error {
 	q := e.Request.URL.Query()
 	page, _ := strconv.Atoi(q.Get("page"))
 	perPage, _ := strconv.Atoi(q.Get("perPage"))
-	var viewer *core.Record
-	if e.Auth != nil && e.Auth.Collection().Name == "users" {
-		viewer = e.Auth
-	}
+	viewer := viewer(e)
 	res, err := d.Svc.List(requests.Query{
 		Sort: q.Get("sort"), Statuses: csv(q.Get("status")), Boards: csv(q.Get("board")),
 		Tags: csv(q.Get("tag")), Visibility: q.Get("visibility"), Search: q.Get("q"),
@@ -128,6 +172,39 @@ func (d Deps) list(e *core.RequestEvent) error {
 		return err
 	}
 	return e.JSON(http.StatusOK, res)
+}
+
+func (d Deps) get(e *core.RequestEvent) error {
+	page, err := d.Svc.Get(e.Request.PathValue("id"), viewer(e), e.HasSuperuserAuth())
+	if err != nil {
+		return fail(e, err)
+	}
+	return e.JSON(http.StatusOK, page)
+}
+
+func (d Deps) moveBoard(e *core.RequestEvent) error {
+	var body struct {
+		Board string `json:"board"`
+	}
+	if err := e.BindBody(&body); err != nil || body.Board == "" {
+		return e.BadRequestError("Pick a board.", err)
+	}
+	who, err := actor(e)
+	if err != nil {
+		return err
+	}
+	if err := d.Svc.MoveBoard(e.Request.PathValue("id"), body.Board, who); err != nil {
+		return fail(e, err)
+	}
+	return e.NoContent(http.StatusNoContent)
+}
+
+func (d Deps) stats(e *core.RequestEvent) error {
+	st, err := d.Svc.Stats()
+	if err != nil {
+		return err
+	}
+	return e.JSON(http.StatusOK, st)
 }
 
 func (d Deps) similar(e *core.RequestEvent) error {

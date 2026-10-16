@@ -1,0 +1,73 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import './tokens.css';
+@import './lort.css';
+@import './app.css';
+
+/* shadcn primitives draw with Lort's tokens. Lort owns --primary, --border and --muted
+   (a text colour), so the shadcn palette is not defined here: its Tailwind colour names
+   point straight at Lort tokens instead. */
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-display);
+  --font-display: var(--font-display);
+  --color-background: var(--ground);
+  --color-foreground: var(--ink);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--on-primary);
+  --color-secondary: var(--surface-3);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--surface-2);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--danger-text);
+  --color-border: var(--border);
+  --color-input: var(--border-strong);
+  --color-ring: var(--focus);
+  --color-ground: var(--ground);
+  --color-ground-sunken: var(--ground-sunken);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-primary-text: var(--primary-text);
+  --color-danger-text: var(--danger-text);
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  ::selection {
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+  :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+  }
+}

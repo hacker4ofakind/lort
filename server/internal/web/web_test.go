@@ -35,7 +35,7 @@ func TestProxyForwardsAndExplainsOutages(t *testing.T) {
 		app := testutil.NewApp(t)
 		target := c.target
 		app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-			se.Router.Any("/{path...}", web.Proxy(target))
+			se.Router.Any("/{path...}", web.Proxy(target, func() string { return "" }))
 			return se.Next()
 		})
 		(&tests.ApiScenario{
@@ -43,6 +43,23 @@ func TestProxyForwardsAndExplainsOutages(t *testing.T) {
 			TestAppFactory: func(testing.TB) *tests.TestApp { return app }, DisableTestAppCleanup: true,
 		}).Test(t)
 	}
+}
+
+func TestProxyReplacesTheConfigHeader(t *testing.T) {
+	next := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "config="+r.Header.Get(web.ConfigHeader))
+	}))
+	target, _ := url.Parse(next.URL)
+	app := testutil.NewApp(t)
+	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		se.Router.Any("/{path...}", web.Proxy(target, func() string { return "e30=" }))
+		return se.Next()
+	})
+	(&tests.ApiScenario{
+		Method: http.MethodGet, URL: "/feedback", Headers: map[string]string{web.ConfigHeader: "forged"},
+		ExpectedStatus: 200, ExpectedContent: []string{"config=e30="}, NotExpectedContent: []string{"forged"},
+		TestAppFactory: func(testing.TB) *tests.TestApp { return app }, DisableTestAppCleanup: true,
+	}).Test(t)
 }
 
 func TestSuperviseRestarts(t *testing.T) {

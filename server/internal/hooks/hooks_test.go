@@ -366,3 +366,41 @@ func TestVoteDeleteAndRecountAreAtomic(t *testing.T) {
 		t.Errorf("upvoteCount = %d after a standalone vote delete, want 0", r.GetInt("upvoteCount"))
 	}
 }
+
+func TestDeletingACommentTakesItsReplies(t *testing.T) {
+	f := newFixture(t)
+	r := testutil.Request(t, f.app, f.features, f.mara, "Dark mode", "pending", 0)
+	say := func(author *core.Record, body, parent string) *core.Record {
+		c := core.NewRecord(mustCollection(t, f.app, "comments"))
+		c.Set("request", r.Id)
+		c.Set("author", author.Id)
+		c.Set("body", body)
+		c.Set("parent", parent)
+		if err := f.app.Save(c); err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	top := say(f.mara, "Me too", "")
+	say(f.admin, "Which version?", top.Id)
+	other := say(f.admin, "Reproduced it", "")
+
+	f.scenario(t, tests.ApiScenario{
+		Method: http.MethodDelete, URL: "/api/collections/comments/records/" + top.Id,
+		Headers: map[string]string{"Authorization": testutil.Token(t, f.mara)}, ExpectedStatus: 204,
+	}, func(t *testing.T, app *tests.TestApp) {
+		n, err := app.CountRecords("comments", dbx.HashExp{"request": r.Id})
+		if err != nil || n != 1 {
+			t.Fatalf("comments left = %d, %v; want only %q", n, err, other.GetString("body"))
+		}
+	})
+
+	// A request's cascade still deletes every comment, replies included.
+	say(f.mara, "Again", other.Id)
+	if err := f.app.Delete(r); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := f.app.CountRecords("comments", dbx.HashExp{"request": r.Id}); n != 0 {
+		t.Fatalf("comments after deleting the request = %d", n)
+	}
+}

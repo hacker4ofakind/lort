@@ -1,0 +1,205 @@
+/* Lort design tokens (DESIGN.md). Dark is the default; the visitor's system setting picks light,
+   and data-theme="dark" or data-theme="light" on any element forces a theme inside it. */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --ground: #1a1716;
+  --ground-sunken: #151211;
+  --surface: #24201e;
+  --surface-2: #2c2725;
+  --surface-3: #352f2c;
+  --border: #352f2c;
+  --border-strong: #423a36;
+  --dot-empty: #7a6e67;
+  --ink: #f5efea;
+  --ink-2: #d8cdc5;
+  --muted: #b3a79e;
+  --primary: #cc3a6d;
+  --on-primary: #ffffff;
+  --primary-text: #f08aae;
+  --primary-soft: #3a1e29;
+  --keyline: #f5efea;
+  --focus: #f5efea;
+  --danger-text: #ff8a7a;
+  --note-bg: #2a2418;
+  --note-border: #6b5a33;
+  --note-ink: #e8c77e;
+  --status-pending: #eab308;
+  --status-reviewing: #f97316;
+  --status-planned: #38bdf8;
+  --status-progress: #a855f7;
+  --status-completed: #22c55e;
+  --status-closed: #ef4444;
+  --status-pending-text: var(--status-pending);
+  --status-reviewing-text: var(--status-reviewing);
+  --status-planned-text: var(--status-planned);
+  --status-progress-text: #c084fc;
+  --status-completed-text: #4ade80;
+  --status-closed-text: #f87171;
+  --shadow-sticker: 0 3px 8px rgba(0, 0, 0, 0.45);
+  --shadow-float: 0 14px 36px rgba(0, 0, 0, 0.5);
+  --shadow-card-float: 0 8px 20px rgba(0, 0, 0, 0.35);
+  --shadow-inset-sm: inset 0 1.7px 2.55px -0.85px rgba(0, 0, 0, 0.9);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    --ground: #f3f1ef;
+    --ground-sunken: #ebe7e4;
+    --surface: #ffffff;
+    --surface-2: #efeae6;
+    --surface-3: #e4ddd8;
+    --border: #e3ddd8;
+    --border-strong: #cfc6bf;
+    --dot-empty: #8c817a;
+    --ink: #1e1a18;
+    --ink-2: #3d3532;
+    --muted: #655b55;
+    --primary: #cc3a6d;
+    --on-primary: #ffffff;
+    --primary-text: #b02a5a;
+    --primary-soft: #f9e3eb;
+    --keyline: #ffffff;
+    --focus: #1e1a18;
+    --danger-text: #b42318;
+    --note-bg: #fbf3df;
+    --note-border: #c9a961;
+    --note-ink: #7a5a12;
+    --status-pending: #b27703;
+    --status-reviewing: #e2520b;
+    --status-planned: #0284c7;
+    --status-progress: #9333ea;
+    --status-completed: #15913f;
+    --status-closed: #dc2626;
+    --status-pending-text: #8f5606;
+    --status-reviewing-text: #b23a0a;
+    --status-planned-text: #0369a1;
+    --status-progress-text: #7e22ce;
+    --status-completed-text: #13733a;
+    --status-closed-text: #b91c1c;
+    --shadow-sticker: 0 2px 6px rgba(60, 30, 20, 0.28);
+    --shadow-float: 0 14px 36px rgba(60, 40, 30, 0.18);
+    --shadow-card-float: 0 8px 20px rgba(60, 40, 30, 0.12);
+    --shadow-inset-sm: inset 0 1.7px 2.55px -0.85px rgba(60, 30, 20, 0.2);
+  }
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --ground: #f3f1ef;
+  --ground-sunken: #ebe7e4;
+  --surface: #ffffff;
+  --surface-2: #efeae6;
+  --surface-3: #e4ddd8;
+  --border: #e3ddd8;
+  --border-strong: #cfc6bf;
+  --dot-empty: #8c817a;
+  --ink: #1e1a18;
+  --ink-2: #3d3532;
+  --muted: #655b55;
+  --primary: #cc3a6d;
+  --on-primary: #ffffff;
+  --primary-text: #b02a5a;
+  --primary-soft: #f9e3eb;
+  --keyline: #ffffff;
+  --focus: #1e1a18;
+  --danger-text: #b42318;
+  --note-bg: #fbf3df;
+  --note-border: #c9a961;
+  --note-ink: #7a5a12;
+  --status-pending: #b27703;
+  --status-reviewing: #e2520b;
+  --status-planned: #0284c7;
+  --status-progress: #9333ea;
+  --status-completed: #15913f;
+  --status-closed: #dc2626;
+  --status-pending-text: #8f5606;
+  --status-reviewing-text: #b23a0a;
+  --status-planned-text: #0369a1;
+  --status-progress-text: #7e22ce;
+  --status-completed-text: #13733a;
+  --status-closed-text: #b91c1c;
+  --shadow-sticker: 0 2px 6px rgba(60, 30, 20, 0.28);
+  --shadow-float: 0 14px 36px rgba(60, 40, 30, 0.18);
+  --shadow-card-float: 0 8px 20px rgba(60, 40, 30, 0.12);
+  --shadow-inset-sm: inset 0 1.7px 2.55px -0.85px rgba(60, 30, 20, 0.2);
+}
+
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-14: 56px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+  --radius-full: 50%;
+  --tilt-sticker: -7deg;
+  --tilt-mark: -4deg;
+}
+
+.display-xl {
+  font-family: var(--font-display);
+  font-size: 44px;
+  line-height: 46px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.display-l {
+  font-family: var(--font-display);
+  font-size: 34px;
+  line-height: 38px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+.title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 25px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.count {
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 17px;
+  font-weight: 800;
+}
+.body-lg {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 26px;
+  font-weight: 400;
+}
+.body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 23px;
+  font-weight: 400;
+}
+.label {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.caption {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+}
+.micro {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 700;
+}
