@@ -11,7 +11,7 @@ Lort is a free, open-source, self-hosted feedback board, roadmap and changelog f
 |---|---|
 | Product record (users, purpose, principles) | `PRODUCT.md` |
 | Design system (tokens, rules, components) | `DESIGN.md`, plus the live Design System artifact https://claude.ai/artifact/A9Uo2hkwam4Q63WKpUhtVA |
-| Component source (React 18 + TS) | `design/components/src/*.tsx`, styles in `design/components/lort.css` |
+| Component reference (visual only, like a Figma file) | `design/components/src/*.tsx`, styles in `design/components/lort.css`. Never copied into `web/`: see 2.3 |
 | Approved page designs | Claude Design canvas https://claude.ai/artifact/EYjbK9CRgK2XvR1gFQov1v, page "Pages" (the "Directions" page holds the rejected explorations) |
 
 When this spec and a canvas artboard disagree on layout, the artboard wins. When they disagree on behaviour, this spec wins.
@@ -88,14 +88,15 @@ The proxy always replaces `X-Lort-Config` (base64 JSON: app name, logo, primary 
 ```
 server/        Go module: main, pocketbase hooks, jobs, mail, webhooks, mcp, whisper, tls, proxy, setup CLI subcommands
 web/           Next.js (App Router, output: 'standalone') + shadcn/ui + Tailwind + Motion + Tiptap v3, pnpm
-  components/lort/   the design-system components, ported from design/components
+  components/ui/     shadcn/ui components, added with the shadcn CLI
+  components/lort/   Lort's components (VoteSticker, StatusIcon, TriageBar…), built from components/ui and Tailwind
 docs/          Markdown docs, embedded in the Go binary and rendered at /dashboard/docs
 mcp/docs.mjs   zero-dependency stdio MCP server exposing docs/ before Lort is installed
-design/        design-system source of truth (components + lort.css)
+design/        the design: canvases and a reference build of the components (visual reference only, never copied into web/)
 Dockerfile     multi-stage: Go build → Node build (pnpm) → slim runtime (debian-slim + node + tini)
 setup.sh, setup.ps1
 ```
-Frontend rules: shadcn components are added with `pnpm dlx shadcn@latest add …`, never written from memory. The project is created with `pnpm dlx shadcn@latest init -t next`. Icons are Tabler (`@tabler/icons-react`, outline, 2px stroke); statuses and stickers use Lort's own SVG components. No Unicode glyphs as icons.
+Frontend rules: `design/` is treated like a Figma file. It shows how the app looks and behaves; its React and CSS are not production code and are never copied, ported or imported into `web/`. The UI is built with shadcn/ui components and styled with Tailwind utility classes. Use the shadcn component for anything shadcn has (button, input, textarea, switch, checkbox, badge, tabs, table, dialog, popover, dropdown menu, sheet, tooltip, command, avatar, skeleton, toast/sonner, and so on), customised through its variants and Tailwind classes; build only what shadcn lacks (the vote sticker, status icons, the triage and floating bars) from shadcn parts and Tailwind. Lort's tokens are Tailwind theme variables (`@theme` in `globals.css`), with shadcn's theme variables mapped onto them; no hand-written component CSS. shadcn components are added with `pnpm dlx shadcn@latest add …`, never written from memory. The project is created with `pnpm dlx shadcn@latest init -t next`. Icons are Tabler (`@tabler/icons-react`, outline, 2px stroke); statuses and stickers use Lort's own SVG components. No Unicode glyphs as icons.
 
 ## 3. Data model (PocketBase collections)
 
@@ -415,7 +416,7 @@ Each phase ends with a working container.
 1. **Foundation:**
    - Covers: the container, setup scripts (including `--reset-admin`), the Go binary with routing and TLS, auth, boards, tags, requests, votes and comments.
    - Pages: the public board and request page, the dashboard requests table, the request page with triage and merge, and the Settings sections for Branding, Boards, Tags and Team.
-   - The design system ported into `web/components/lort`, plus skeletons for these pages.
+   - The design system rebuilt in `web/` with shadcn/ui and Tailwind (2.3), plus skeletons for these pages.
 2. **Roadmap and changelog:**
    - The public and dashboard roadmaps.
    - The changelog editor with scheduling, and the public changelog pages.
@@ -455,7 +456,7 @@ The full token tables and component rules are in `DESIGN.md`. This part fixes th
 - **Icons:** Tabler outline, 2px stroke; GitHub mark is Tabler `brand-github`.
 
 ### 14.4 Components
-Port `design/components/src` into `web/components/lort` as client components and keep the `lt-` CSS (or translate to Tailwind classes 1:1, keeping the tokens as CSS variables). Use shadcn primitives (Dialog, Popover, DropdownMenu, Command, Calendar, Sheet, Tooltip, Switch) underneath, restyled to the tokens.
+Build each component in `web/` with shadcn/ui and Tailwind, following the frontend rules in 2.3. `design/components` and the canvases show how each one looks and behaves; match that, but never copy their code or the `lt-` CSS. Where shadcn has the component (Button, Input, Textarea, Switch, Checkbox, Badge, Tabs, Table, Dialog, Popover, DropdownMenu, Command, Calendar, Sheet, Tooltip, Avatar, Skeleton, Sonner), add it with the CLI and give it Lort's look through variants and Tailwind classes. The rules below describe the result, not the reference code.
 
 | Component | Rules |
 |---|---|
