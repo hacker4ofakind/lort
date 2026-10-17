@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { useUrlSearch } from "@/lib/use-url-search"
+import { clearUrlSearch, useUrlSearch } from "@/lib/use-url-search"
 
 describe("useUrlSearch", () => {
   beforeEach(() => vi.useFakeTimers())
@@ -8,8 +8,15 @@ describe("useUrlSearch", () => {
 
   const setup = (url: string) => {
     const commit = vi.fn()
-    const hook = renderHook(({ url }) => useUrlSearch(url, commit), { initialProps: { url } })
-    return { commit, hook, value: () => hook.result.current[0], type: (v: string) => act(() => hook.result.current[1](v)) }
+    const hook = renderHook(({ url }) => useUrlSearch(url, commit), {
+      initialProps: { url },
+    })
+    return {
+      commit,
+      hook,
+      value: () => hook.result.current[0],
+      type: (v: string) => act(() => hook.result.current[1](v)),
+    }
   }
 
   it("writes the URL 300 ms after the last key", () => {
@@ -52,5 +59,18 @@ describe("useUrlSearch", () => {
     expect(value()).toBe("abc")
     act(() => vi.advanceTimersByTime(300))
     expect(commit).toHaveBeenLastCalledWith("abc")
+  })
+
+  it("drops a search that hasn't reached the URL yet when filters are cleared", () => {
+    const { commit, value, type } = setup("")
+    type("dark")
+    act(() => vi.advanceTimersByTime(100))
+    act(() => clearUrlSearch())
+    expect(value()).toBe("")
+    act(() => vi.advanceTimersByTime(1000))
+    expect(commit).not.toHaveBeenCalled()
+    type("mode") // typing works as before afterwards
+    act(() => vi.advanceTimersByTime(300))
+    expect(commit).toHaveBeenCalledExactlyOnceWith("mode")
   })
 })

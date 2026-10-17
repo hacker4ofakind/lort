@@ -2,12 +2,27 @@
 
 import { useEffect, useRef, useState } from "react"
 
+const clears = new Set<() => void>()
+
+/**
+ * For "Clear filters": empties every search field and cancels its pending URL write. The URL's
+ * own change isn't enough when the search hadn't reached it yet: q was empty before and after.
+ */
+export function clearUrlSearch() {
+  clears.forEach((clear) => clear())
+}
+
 /**
  * A search field whose value lives in the URL. Typing writes the URL (commit) `ms` after the last
  * key; a URL change from anywhere else (Clear filters, back and forward) replaces the field's
  * value. When one of its own writes lands while you're still typing, the newer text stays.
+ * Clear filters calls clearUrlSearch().
  */
-export function useUrlSearch(urlValue: string, commit: (value: string) => void, ms = 300): [string, (value: string) => void] {
+export function useUrlSearch(
+  urlValue: string,
+  commit: (value: string) => void,
+  ms = 300
+): [string, (value: string) => void] {
   const [value, setValue] = useState(urlValue)
   const [prevUrl, setPrevUrl] = useState(urlValue)
   const [pending, setPending] = useState<string | null>(null) // the last value written, until it lands
@@ -16,6 +31,17 @@ export function useUrlSearch(urlValue: string, commit: (value: string) => void, 
     if (urlValue === pending) setPending(null)
     else setValue(urlValue)
   }
+
+  useEffect(() => {
+    const clear = () => {
+      setValue("")
+      setPending(null)
+    }
+    clears.add(clear)
+    return () => {
+      clears.delete(clear)
+    }
+  }, [])
 
   const commitRef = useRef(commit)
   useEffect(() => {

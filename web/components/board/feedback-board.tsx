@@ -12,13 +12,24 @@ import { SuggestDialog } from "@/components/board/suggest-dialog"
 import { useVote } from "@/components/board/use-vote"
 import { FloatingBar } from "@/components/lort/floating-bar"
 import { Button } from "@/components/ui/button"
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { listRequests } from "@/lib/api"
-import { apiParams, boardSearch, parseBoardFilters, type BoardFilters } from "@/lib/filters"
+import {
+  apiParams,
+  boardSearch,
+  parseBoardFilters,
+  type BoardFilters,
+} from "@/lib/filters"
 import { pb } from "@/lib/pocketbase"
 import { keys } from "@/lib/query"
 import { useLiveRefresh } from "@/lib/realtime"
 import { OPEN_STATUSES } from "@/lib/status"
+import { clearUrlSearch } from "@/lib/use-url-search"
 
 const FRESH_MS = 4000
 
@@ -35,13 +46,16 @@ export function FeedbackBoard() {
   const [fresh, setFresh] = useState<string[]>([])
 
   const setFilters = (next: Partial<BoardFilters>) =>
-    router.replace(`${pathname}${boardSearch({ ...filters, ...next })}`, { scroll: false })
+    router.replace(`${pathname}${boardSearch({ ...filters, ...next })}`, {
+      scroll: false,
+    })
 
   const list = useInfiniteQuery({
     queryKey: keys.requests("board", params),
     queryFn: ({ pageParam }) => listRequests(pb, params, pageParam),
     initialPageParam: 1,
-    getNextPageParam: (last) => (last.page * last.perPage < last.totalItems ? last.page + 1 : undefined),
+    getNextPageParam: (last) =>
+      last.page * last.perPage < last.totalItems ? last.page + 1 : undefined,
   })
 
   // useLiveRefresh keeps the latest callback in a ref, so this needn't be memoised.
@@ -53,7 +67,9 @@ export function FeedbackBoard() {
 
   const items = list.data?.pages.flatMap((p) => p.items) ?? []
   const filtered =
-    filters.q !== "" || filters.board.length > 0 || filters.status.join() !== OPEN_STATUSES.join()
+    filters.q !== "" ||
+    filters.board.length > 0 ||
+    filters.status.join() !== OPEN_STATUSES.join()
 
   return (
     <main className="mx-auto max-w-[860px] px-4 pt-3.5 sm:px-8 sm:pt-9">
@@ -62,7 +78,10 @@ export function FeedbackBoard() {
       </h1>
       <p className="mt-2 mb-[18px] max-w-[60ch] text-body text-ink-2 sm:mt-3 sm:mb-[30px] sm:text-body-lg">
         Stick a dot on the ones you want most.
-        <span className="max-sm:hidden"> The team builds what gets the most dots, and tells you when it ships.</span>
+        <span className="max-sm:hidden">
+          {" "}
+          The team builds what gets the most dots, and tells you when it ships.
+        </span>
       </p>
 
       {list.isPending ? (
@@ -71,7 +90,9 @@ export function FeedbackBoard() {
         <Empty>
           <EmptyHeader>
             <EmptyTitle>The ideas didn&apos;t load</EmptyTitle>
-            <EmptyDescription>Check your connection, then try again.</EmptyDescription>
+            <EmptyDescription>
+              Check your connection, then try again.
+            </EmptyDescription>
           </EmptyHeader>
           <Button variant="secondary" onClick={() => list.refetch()}>
             Try again
@@ -80,13 +101,23 @@ export function FeedbackBoard() {
       ) : items.length === 0 ? (
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>{filtered ? "No ideas match these filters" : "Nothing here yet"}</EmptyTitle>
+            <EmptyTitle>
+              {filtered ? "No ideas match these filters" : "Nothing here yet"}
+            </EmptyTitle>
             <EmptyDescription>
-              {filtered ? "Try another search or clear the filters." : `Be the first to suggest something for ${config.appName}.`}
+              {filtered
+                ? "Try another search or clear the filters."
+                : `Be the first to suggest something for ${config.appName}.`}
             </EmptyDescription>
           </EmptyHeader>
           {filtered && (
-            <Button variant="secondary" onClick={() => router.replace(pathname, { scroll: false })}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                clearUrlSearch()
+                router.replace(pathname, { scroll: false })
+              }}
+            >
               Clear filters
             </Button>
           )}
@@ -94,9 +125,18 @@ export function FeedbackBoard() {
       ) : (
         <div className="flex flex-col gap-2.5 sm:gap-3">
           {items.map((r) => (
-            <RequestCard key={r.id} request={r} onVote={onVote} fresh={fresh.includes(r.id)} />
+            <RequestCard
+              key={r.id}
+              request={r}
+              onVote={onVote}
+              fresh={fresh.includes(r.id)}
+            />
           ))}
-          <LoadMore hasMore={!!list.hasNextPage} loading={list.isFetchingNextPage} onVisible={() => list.fetchNextPage()} />
+          <LoadMore
+            hasMore={!!list.hasNextPage}
+            loading={list.isFetchingNextPage}
+            onVisible={() => list.fetchNextPage()}
+          />
         </div>
       )}
 
@@ -124,7 +164,11 @@ export function FeedbackBoard() {
         selectedStatuses={filters.status}
         onSelectedStatusesChange={(status) => setFilters({ status })}
       />
-      <SuggestDialog open={suggestOpen} onOpenChange={setSuggestOpen} boards={config.boards} />
+      <SuggestDialog
+        open={suggestOpen}
+        onOpenChange={setSuggestOpen}
+        boards={config.boards}
+      />
     </main>
   )
 }

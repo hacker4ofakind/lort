@@ -2,8 +2,17 @@
 
 import { useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
-import { IconChevronDown, IconPlus, IconRotateClockwise, IconSearch } from "@tabler/icons-react"
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
+import {
+  IconChevronDown,
+  IconPlus,
+  IconRotateClockwise,
+  IconSearch,
+} from "@tabler/icons-react"
 import { useConfig } from "@/app/providers"
 import { LoadMore } from "@/components/board/load-more"
 import { SuggestDialog } from "@/components/board/suggest-dialog"
@@ -21,16 +30,31 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group"
 import { listRequests, stats } from "@/lib/api"
-import { apiParams, parseTableFilters, tableSearch, type TableFilters, type TableSort } from "@/lib/filters"
+import {
+  apiParams,
+  parseTableFilters,
+  tableSearch,
+  type TableFilters,
+  type TableSort,
+} from "@/lib/filters"
 import { pbAdmin } from "@/lib/pocketbase"
 import { keys } from "@/lib/query"
 import { useLiveRefresh } from "@/lib/realtime"
 import { OPEN_STATUSES, type Status } from "@/lib/status"
 import { useCooldown } from "@/lib/use-cooldown"
-import { useUrlSearch } from "@/lib/use-url-search"
+import { clearUrlSearch, useUrlSearch } from "@/lib/use-url-search"
 
 const SORTS: { value: TableSort; label: string }[] = [
   { value: "newest", label: "Newest first" },
@@ -40,7 +64,9 @@ const SORTS: { value: TableSort; label: string }[] = [
 ]
 
 const openSummary = (v: string[]) =>
-  v.length === OPEN_STATUSES.length && OPEN_STATUSES.every((s) => v.includes(s)) ? "Open" : undefined
+  v.length === OPEN_STATUSES.length && OPEN_STATUSES.every((s) => v.includes(s))
+    ? "Open"
+    : undefined
 
 /** /dashboard/requests: counts, filters (all in the URL), the table, realtime and a rate-limited refresh. */
 export function RequestsPage() {
@@ -57,25 +83,39 @@ export function RequestsPage() {
   const [ready, startCooldown] = useCooldown(10_000)
 
   const setFilters = (next: Partial<TableFilters>) =>
-    router.replace(`${pathname}${tableSearch({ ...filters, ...next })}`, { scroll: false })
+    router.replace(`${pathname}${tableSearch({ ...filters, ...next })}`, {
+      scroll: false,
+    })
   // Search: the URL follows the field 300 ms after the last key, and the field follows the URL.
   const [q, setQ] = useUrlSearch(filters.q, (q) =>
-    router.replace(`${pathname}${tableSearch({ ...parseTableFilters(new URLSearchParams(window.location.search)), q })}`, { scroll: false })
+    router.replace(
+      `${pathname}${tableSearch({ ...parseTableFilters(new URLSearchParams(window.location.search)), q })}`,
+      { scroll: false }
+    )
   )
 
-  const counts = useQuery({ queryKey: keys.stats, queryFn: () => stats(pbAdmin) })
+  const counts = useQuery({
+    queryKey: keys.stats,
+    queryFn: () => stats(pbAdmin),
+  })
   const list = useInfiniteQuery({
     queryKey: keys.requests("team", params),
     queryFn: ({ pageParam }) => listRequests(pbAdmin, params, pageParam),
     initialPageParam: 1,
-    getNextPageParam: (last) => (last.page * last.perPage < last.totalItems ? last.page + 1 : undefined),
+    getNextPageParam: (last) =>
+      last.page * last.perPage < last.totalItems ? last.page + 1 : undefined,
   })
 
   const onCreate = (id: string) => {
     setFresh((f) => [...f, id])
     setTimeout(() => setFresh((f) => f.filter((x) => x !== id)), 4000)
   }
-  const { live } = useLiveRefresh(pbAdmin, "requests", [["requests", "team"], keys.stats], onCreate)
+  const { live } = useLiveRefresh(
+    pbAdmin,
+    "requests",
+    [["requests", "team"], keys.stats],
+    onCreate
+  )
 
   const items = list.data?.pages.flatMap((p) => p.items) ?? []
   const total = list.data?.pages[0]?.totalItems ?? 0
@@ -85,7 +125,9 @@ export function RequestsPage() {
     <main className="px-4 pt-6 pb-14 sm:px-10 sm:pt-[30px]">
       <div className="mx-auto max-w-[1060px]">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-[30px] font-extrabold tracking-[-0.025em]">Requests</h1>
+          <h1 className="font-display text-[30px] font-extrabold tracking-[-0.025em]">
+            Requests
+          </h1>
           {counts.data ? (
             <span className="mt-1.5 text-label font-normal text-muted-foreground">
               {counts.data.total} total · {counts.data.waiting} waiting for you
@@ -94,7 +136,11 @@ export function RequestsPage() {
             <Bone w={190} h={14} className="mt-1.5" />
           )}
           <span className="flex-1" />
-          {live && <span className="text-caption font-normal text-muted-foreground">Live</span>}
+          {live && (
+            <span className="text-caption font-normal text-muted-foreground">
+              Live
+            </span>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -138,7 +184,10 @@ export function RequestsPage() {
           <FilterMenu
             allLabel="All boards"
             noun="boards"
-            options={(boards.data ?? []).map((b) => ({ value: b.id, label: b.isPublic ? b.name : `${b.name} (private)` }))}
+            options={(boards.data ?? []).map((b) => ({
+              value: b.id,
+              label: b.isPublic ? b.name : `${b.name} (private)`,
+            }))}
             selected={filters.board}
             onSelectedChange={(board) => setFilters({ board })}
           />
@@ -159,7 +208,11 @@ export function RequestsPage() {
               { value: "hidden", label: "Hidden" },
             ]}
             selected={visibility}
-            onSelectedChange={(v) => setFilters({ visibility: v.length === 1 ? (v[0] as "public" | "hidden") : "" })}
+            onSelectedChange={(v) =>
+              setFilters({
+                visibility: v.length === 1 ? (v[0] as "public" | "hidden") : "",
+              })
+            }
           />
           <span className="flex-1" />
           <DropdownMenu>
@@ -168,7 +221,10 @@ export function RequestsPage() {
               <IconChevronDown className="size-[15px]" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-48">
-              <DropdownMenuRadioGroup value={filters.sort} onValueChange={(v) => setFilters({ sort: v as TableSort })}>
+              <DropdownMenuRadioGroup
+                value={filters.sort}
+                onValueChange={(v) => setFilters({ sort: v as TableSort })}
+              >
                 {SORTS.map((s) => (
                   <DropdownMenuRadioItem key={s.value} value={s.value}>
                     {s.label}
@@ -184,13 +240,23 @@ export function RequestsPage() {
         ) : items.length === 0 ? (
           <Empty className="rounded-lg border bg-card">
             <EmptyHeader>
-              <EmptyTitle>{search ? "Nothing matches these filters" : "No requests yet"}</EmptyTitle>
+              <EmptyTitle>
+                {search ? "Nothing matches these filters" : "No requests yet"}
+              </EmptyTitle>
               <EmptyDescription>
-                {search ? "Try another search or clear the filters." : "When people suggest something, it lands here first."}
+                {search
+                  ? "Try another search or clear the filters."
+                  : "When people suggest something, it lands here first."}
               </EmptyDescription>
             </EmptyHeader>
             {search && (
-              <Button variant="secondary" onClick={() => router.replace(pathname, { scroll: false })}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  clearUrlSearch()
+                  router.replace(pathname, { scroll: false })
+                }}
+              >
                 Clear filters
               </Button>
             )}
@@ -198,7 +264,11 @@ export function RequestsPage() {
         ) : (
           <>
             <RequestsTable items={items} search={search} fresh={fresh} />
-            <LoadMore hasMore={!!list.hasNextPage} loading={list.isFetchingNextPage} onVisible={() => list.fetchNextPage()} />
+            <LoadMore
+              hasMore={!!list.hasNextPage}
+              loading={list.isFetchingNextPage}
+              onVisible={() => list.fetchNextPage()}
+            />
             <p className="mx-1 mt-3.5 text-caption font-normal text-muted-foreground">
               Showing {items.length} of {total}
               {list.hasNextPage ? ". Scroll for more." : "."}
@@ -206,7 +276,12 @@ export function RequestsPage() {
           </>
         )}
       </div>
-      <SuggestDialog open={newOpen} onOpenChange={setNewOpen} team boards={boards.data ?? []} />
+      <SuggestDialog
+        open={newOpen}
+        onOpenChange={setNewOpen}
+        team
+        boards={boards.data ?? []}
+      />
     </main>
   )
 }

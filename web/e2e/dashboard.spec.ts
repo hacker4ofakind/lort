@@ -142,3 +142,17 @@ test("the collapsed rail keeps its links' names", async ({ page }) => {
   expect((await nav.getByRole("link", { name: "Settings" }).boundingBox())!.width).toBeLessThanOrEqual(44)
   await page.getByRole("button", { name: "Expand sidebar" }).click()
 })
+
+test("clearing filters drops a search that hasn't reached the URL yet", async ({ page }) => {
+  await signInAdmin(page)
+  await page.goto("/dashboard/requests?board=no-such-board")
+  const field = page.getByRole("textbox", { name: "Search requests" }).or(page.getByRole("searchbox", { name: "Search requests" }))
+  const clear = page.getByRole("button", { name: "Clear filters" })
+  await expect(clear).toBeVisible()
+  await field.fill("dark")
+  await clear.click() // well inside the 300 ms before "dark" would reach the URL
+  await page.waitForURL((url) => !url.searchParams.has("board"))
+  await page.waitForTimeout(600)
+  expect(new URL(page.url()).searchParams.has("q")).toBe(false)
+  await expect(field).toHaveValue("")
+})
