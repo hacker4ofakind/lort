@@ -231,6 +231,8 @@ func ensureSettings(app core.App) error {
 		&core.BoolField{Name: "showLandingCard"},
 		&core.BoolField{Name: "roadmapPublic"},
 	)
+	// The favicon is the logo's 64x64 thumb. Set on existing boards too: add() skips fields that exist.
+	c.Fields.GetByName("logo").(*core.FileField).Thumbs = []string{"64x64"}
 	// Superusers only. Public values are served by GET /api/lort/config.
 	c.ListRule, c.ViewRule, c.CreateRule, c.UpdateRule, c.DeleteRule = nil, nil, nil, nil, nil
 	if err := app.Save(c); err != nil {
@@ -247,12 +249,14 @@ func ensureSettings(app core.App) error {
 	return app.Save(r)
 }
 
-// ensureSearch keeps an FTS5 index of request titles and bodies in sync with triggers.
+// ensureSearch keeps an FTS5 index of request titles and bodies in sync with triggers, plus
+// its vocabulary (every distinct indexed word), which search uses to forgive typos.
 func ensureSearch(app core.App) error {
 	_, err := app.DB().NewQuery(`
 		CREATE VIRTUAL TABLE IF NOT EXISTS requests_fts USING fts5(
 			title, body, content='requests', content_rowid='rowid', tokenize='porter unicode61'
 		);
+		CREATE VIRTUAL TABLE IF NOT EXISTS requests_fts_vocab USING fts5vocab(requests_fts, 'row');
 		CREATE TRIGGER IF NOT EXISTS requests_fts_ai AFTER INSERT ON requests BEGIN
 			INSERT INTO requests_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
 		END;

@@ -6,6 +6,7 @@ import "./globals.css"
 import { Providers } from "@/app/providers"
 import { brandCss } from "@/lib/colors"
 import { CONFIG_HEADER, parseConfig } from "@/lib/config"
+import { favicon } from "@/lib/favicon"
 import { cn } from "@/lib/utils"
 
 // Self-hosted at build time by next/font.
@@ -16,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const config = parseConfig((await headers()).get(CONFIG_HEADER))
   return {
     title: { default: config.appName, template: `%s · ${config.appName}` },
-    icons: config.logo ? { icon: config.logo } : undefined,
+    icons: { icon: favicon(config) },
   }
 }
 

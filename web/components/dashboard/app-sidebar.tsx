@@ -41,7 +41,7 @@ export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const profile = useUser()
-  const { toggleSidebar } = useSidebar()
+  const { state, toggleSidebar } = useSidebar()
   const counts = useQuery({ queryKey: keys.stats, queryFn: () => stats(pbAdmin) })
 
   const item = (i: (typeof TOP)[number], badge?: number) => (
@@ -61,14 +61,14 @@ export function AppSidebar() {
         <span className="flex-1 truncate font-display text-[17px] font-extrabold group-data-[collapsible=icon]:hidden">
           {config.appName}
         </span>
-        <Button variant="ghost" size="icon-sm" aria-label="Collapse sidebar" onClick={toggleSidebar} className="max-md:hidden">
+        <Button variant="ghost" size="icon-sm" aria-label={state === "collapsed" ? "Expand sidebar" : "Collapse sidebar"} onClick={toggleSidebar} className="max-md:hidden">
           <IconLayoutSidebarLeftCollapse className="size-[18px] group-data-[collapsible=icon]:rotate-180" />
         </Button>
       </SidebarHeader>
       <SidebarContent className="px-3">
-        <SidebarMenu className="gap-1">{TOP.map((i) => item(i, counts.data?.new))}</SidebarMenu>
+        <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">{TOP.map((i) => item(i, counts.data?.new))}</SidebarMenu>
         <div className="flex-1" />
-        <SidebarMenu className="gap-1">{BOTTOM.map((i) => item(i))}</SidebarMenu>
+        <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">{BOTTOM.map((i) => item(i))}</SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="px-5 pt-3 pb-4 group-data-[collapsible=icon]:px-2">
         <DropdownMenu>

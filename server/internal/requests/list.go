@@ -1,9 +1,7 @@
 package requests
 
 import (
-	"strings"
 	"time"
-	"unicode"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -67,7 +65,10 @@ func (s *Service) List(q Query, viewer *core.Record, team bool) (Page, error) {
 	if q.Page < 1 {
 		q.Page = 1
 	}
-	base := s.filter(q, viewer, team)
+	base, err := s.filter(q, viewer, team)
+	if err != nil {
+		return Page{}, err
+	}
 
 	var total int
 	if err := base.Select("count(*)").Row(&total); err != nil {
@@ -75,7 +76,7 @@ func (s *Service) List(q Query, viewer *core.Record, team bool) (Page, error) {
 	}
 
 	var ids []string
-	err := base.Select("r.id").OrderBy(order(q.Sort)...).Limit(int64(q.PerPage)).Offset(int64((q.Page - 1) * q.PerPage)).Column(&ids)
+	err = base.Select("r.id").OrderBy(order(q.Sort)...).Limit(int64(q.PerPage)).Offset(int64((q.Page - 1) * q.PerPage)).Column(&ids)
 	if err != nil {
 		return Page{}, err
 	}
@@ -87,7 +88,7 @@ func (s *Service) List(q Query, viewer *core.Record, team bool) (Page, error) {
 }
 
 // filter is the FROM and WHERE shared by List and Queue.
-func (s *Service) filter(q Query, viewer *core.Record, team bool) *dbx.SelectQuery {
+func (s *Service) filter(q Query, viewer *core.Record, team bool) (*dbx.SelectQuery, error) {
 	where := []dbx.Expression{dbx.HashExp{"r.mergedInto": ""}}
 	if !team {
 		public := dbx.And(dbx.HashExp{"r.visible": true}, dbx.NewExp("b.isPublic = 1"))
@@ -117,10 +118,21 @@ func (s *Service) filter(q Query, viewer *core.Record, team bool) *dbx.SelectQue
 		}
 		where = append(where, dbx.Or(ors...))
 	}
-	if m := ftsQuery(q.Search); m != "" {
+	if words := searchWords(q.Search); len(words) > 0 {
+		var vocab []string
+		for _, w := range words {
+			if maxEdits(w) > 0 {
+				// The index's distinct (stemmed) words, for typo matches.
+				if err := s.App.DB().NewQuery("SELECT term FROM requests_fts_vocab").Column(&vocab); err != nil {
+					return nil, err
+				}
+				break
+			}
+		}
+		m := searchQuery(q.Search, vocab)
 		where = append(where, dbx.NewExp("r.rowid IN (SELECT rowid FROM requests_fts WHERE requests_fts MATCH {:fts})", dbx.Params{"fts": m}))
 	}
-	return s.App.DB().Select().From("requests r").InnerJoin("boards b", dbx.NewExp("b.id = r.board")).Where(dbx.And(where...))
+	return s.App.DB().Select().From("requests r").InnerJoin("boards b", dbx.NewExp("b.id = r.board")).Where(dbx.And(where...)), nil
 }
 
 // order is the ORDER BY for a sort name; trending is the default.
@@ -151,8 +163,11 @@ const queueMax = 1000
 // Queue finds current in the team's list for q and the request after it. When current has
 // left the list (its status changed), Next is the first request of the list.
 func (s *Service) Queue(q Query, current string) (QueueInfo, error) {
-	base := s.filter(q, nil, true)
 	var info QueueInfo
+	base, err := s.filter(q, nil, true)
+	if err != nil {
+		return info, err
+	}
 	if err := base.Select("count(*)").Row(&info.Total); err != nil {
 		return info, err
 	}
@@ -257,24 +272,6 @@ func (s *Service) items(ids []string, viewer *core.Record, team bool) ([]Item, e
 		out = append(out, it)
 	}
 	return out, nil
-}
-
-// ftsQuery turns free text into a safe FTS5 prefix query: `"dark"* "mode"*`.
-func ftsQuery(text string) string {
-	words := strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-	})
-	parts := make([]string, 0, len(words))
-	for _, w := range words {
-		if len(w) < 2 {
-			continue
-		}
-		parts = append(parts, `"`+w+`"*`)
-		if len(parts) == 8 {
-			break
-		}
-	}
-	return strings.Join(parts, " ")
 }
 
 func anys(ss []string) []any {

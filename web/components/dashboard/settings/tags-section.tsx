@@ -55,7 +55,7 @@ export function TagsSection() {
   }
 
   return (
-    <SettingsSection id="tags" title="Tags" lede="Labels you can put on requests. People can pick from these when they suggest something.">
+    <SettingsSection id="tags" title="Tags">
       <div className="flex flex-wrap gap-2">
         {tags.isPending ? (
           [64, 48, 72].map((w) => <Bone key={w} w={w} h={34} />)

@@ -93,7 +93,7 @@ export function BoardsSection() {
     <SettingsSection
       id="boards"
       title="Boards"
-      lede="Drag to reorder. The top board is the default for new suggestions. Private boards are only visible to your team."
+      lede="The top board is the default for new suggestions. Private boards are only visible to your team."
     >
       <div className={cn(GRID, "pb-1.5 text-[12px] font-bold text-muted-foreground")}>
         <span />

@@ -98,3 +98,17 @@ test("an invited admin sets a password and lands in the dashboard", async ({ pag
   await expect(invitee.getByRole("heading", { level: 1, name: "Requests" })).toBeVisible()
   await invitee.close()
 })
+
+test("the table of contents follows the section you're on", async ({ page }) => {
+  const toc = page.getByRole("navigation", { name: "Settings sections" })
+  const current = toc.locator("[aria-current]")
+  await expect(current).toHaveText("Branding")
+  for (const section of ["Tags", "Team", "Branding", "Boards"]) {
+    await toc.getByRole("link", { name: section }).click()
+    await expect(current).toHaveText(section)
+  }
+  await page.mouse.wheel(0, 10_000)
+  await expect(current).toHaveText("Team")
+  await page.mouse.wheel(0, -10_000)
+  await expect(current).toHaveText("Branding")
+})

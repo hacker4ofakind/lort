@@ -31,6 +31,14 @@ test("the team moves a request through every status, with undo", async ({ page, 
 
   await triage(page).getByRole("button", { name: "Complete" }).click()
   await expect(page.getByText("Marked as completed")).toBeVisible()
+  // The message, Undo and the close button share one line.
+  const [message, undo, dismiss] = await Promise.all(
+    [page.getByText("Marked as completed"), page.getByRole("button", { name: "Undo" }), page.getByRole("button", { name: "Dismiss" })].map(
+      (l) => l.boundingBox()
+    )
+  )
+  expect(Math.abs(message!.y + message!.height / 2 - (undo!.y + undo!.height / 2))).toBeLessThan(4)
+  expect(Math.abs(undo!.y + undo!.height / 2 - (dismiss!.y + dismiss!.height / 2))).toBeLessThan(4)
   await page.getByRole("button", { name: "Undo" }).click()
   await expect(page.getByText("Moved back to In progress")).toBeVisible()
   await expect(page.getByRole("button", { name: "Status: In progress" })).toBeVisible()

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { seedRequest, unique } from "./helpers"
+import { expectAccessible, seedRequest, unique } from "./helpers"
 
 test("a visitor signs up inside Suggest something, posts, votes and comments", async ({ page }) => {
   const id = unique()
@@ -36,6 +36,12 @@ test("a visitor signs up inside Suggest something, posts, votes and comments", a
   await expect(page.getByText("Thanks for checking.")).toBeVisible()
   // Replies count: the comment and its reply.
   await expect(page.getByRole("heading", { name: "2 comments" })).toBeVisible()
+  await expectAccessible(page)
+
+  // The avatar opens the account menu, and a board user can sign out from it.
+  await page.getByRole("button", { name: /your account/ }).click()
+  await page.getByRole("menuitem", { name: "Sign out" }).click()
+  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible()
 })
 
 test("similar requests show up while typing a title", async ({ page, request }) => {
@@ -69,11 +75,12 @@ test("an idea on a board that needs approval waits, visible only to its author",
   await dialog.getByRole("button", { name: "Send" }).click()
   await page.waitForURL(/\/feedback\/[a-z0-9]+$/)
 
-  await page.goto("/feedback")
+  // Newest first: the suite shares one board, so under Trending a new idea can land past page 1.
+  await page.goto("/feedback?sort=newest")
   await expect(page.getByRole("article").filter({ hasText: title }).getByText("Waiting for approval")).toBeVisible()
 
   const stranger = await browser.newPage()
-  await stranger.goto("/feedback")
+  await stranger.goto("/feedback?sort=newest")
   await expect(stranger.getByRole("heading", { level: 1 })).toBeVisible()
   await expect(stranger.getByText(title)).toHaveCount(0)
   await stranger.close()

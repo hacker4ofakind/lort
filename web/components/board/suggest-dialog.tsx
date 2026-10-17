@@ -125,12 +125,15 @@ function SuggestForm({ team, boards, onDone }: { team: boolean; boards: Ref[]; o
       {boards.length > 1 && (
         <Field>
           <FieldTitle>Board</FieldTitle>
-          <Segmented
-            aria-label="Board"
-            options={boards.map((b) => ({ value: b.id, label: b.name }))}
-            value={board}
-            onValueChange={setBoard}
-          />
+          {/* Field stretches its direct children; the wrapper takes that, so the track keeps its own width. */}
+          <div>
+            <Segmented
+              aria-label="Board"
+              options={boards.map((b) => ({ value: b.id, label: b.name }))}
+              value={board}
+              onValueChange={setBoard}
+            />
+          </div>
         </Field>
       )}
 

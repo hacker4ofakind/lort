@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 export function SettingsSection({ id, title, lede, children }: { id: string; title: string; lede?: string; children: ReactNode }) {
   return (
     <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-6 rounded-lg border bg-card px-6 py-[22px]">
-      <h2 id={`${id}-title`} className="font-display text-title">
+      <h2 id={`${id}-title`} className={cn("font-display text-title", !lede && "mb-[18px]")}>
         {title}
       </h2>
       {lede && <p className="mt-1 mb-[18px] max-w-[62ch] text-label font-normal text-muted-foreground">{lede}</p>}

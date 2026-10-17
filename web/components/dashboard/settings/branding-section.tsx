@@ -34,7 +34,7 @@ export function BrandingSection({ settings: s, save }: { settings: Settings; sav
   const color = s.primaryColor.toLowerCase()
 
   return (
-    <SettingsSection id="branding" title="Branding" lede="How your board looks to your users. Lort stays in the background.">
+    <SettingsSection id="branding" title="Branding">
       <SettingRow title="App logo" description="Square PNG, SVG or WebP, at least 128 px.">
         <LogoMark appName={s.appName} logo={logo} size={56} className="rounded-[14px]" />
         <input
@@ -98,6 +98,13 @@ export function BrandingSection({ settings: s, save }: { settings: Settings; sav
           </ToggleGroup>
           <label className="flex items-center gap-2 text-caption font-normal text-muted-foreground">
             Custom
+            {/* A live preview the size of the presets: what you've typed once it's a valid hex,
+                otherwise the saved colour. */}
+            <span
+              aria-hidden
+              className="size-[30px] shrink-0 rounded-full"
+              style={{ backgroundColor: HEX.test(hex.trim()) ? hex.trim() : s.primaryColor }}
+            />
             <Input
               aria-label="Custom hex colour"
               aria-invalid={!!hexError}
@@ -121,7 +128,7 @@ export function BrandingSection({ settings: s, save }: { settings: Settings; sav
       </SettingRow>
       <SettingRow
         title="Show “Get your own board” card"
-        description="A small card on public pages that links to Lort. “Powered by Lort” in the footer stays either way."
+        description="“Powered by Lort” in the footer stays either way."
         htmlFor="landing-card"
       >
         <Switch

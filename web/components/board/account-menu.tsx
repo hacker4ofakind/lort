@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -37,26 +38,31 @@ export function AccountMenu({ size = 38 }: { size?: number }) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={<button type="button" className="rounded-full" aria-label="Your account" />}
+          render={<button type="button" className="rounded-full" />}
         >
+          {/* Named by its content (the avatar's name), so the visible initial is part of it (WCAG 2.5.3). */}
           <PersonAvatar person={{ ...user, team: user.isAdmin }} size={size} keyline />
+          <span className="sr-only">, your account</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-56">
-          <DropdownMenuLabel className="text-caption font-semibold text-foreground">
-            {user.name}
-            <span className="block font-normal text-muted-foreground">{user.email}</span>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setProfileOpen(true)}>Your profile</DropdownMenuItem>
-          {user.isAdmin && <DropdownMenuItem render={<Link href="/dashboard/requests" />}>Dashboard</DropdownMenuItem>}
-          <DropdownMenuItem
-            onClick={async () => {
-              pb.authStore.clear()
-              await qc.invalidateQueries()
-            }}
-          >
-            Sign out
-          </DropdownMenuItem>
+          {/* A group label must sit inside a group: Base UI throws without one. */}
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="text-caption font-semibold text-foreground">
+              {user.name}
+              <span className="block font-normal text-muted-foreground">{user.email}</span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setProfileOpen(true)}>Your profile</DropdownMenuItem>
+            {user.isAdmin && <DropdownMenuItem render={<Link href="/dashboard/requests" />}>Dashboard</DropdownMenuItem>}
+            <DropdownMenuItem
+              onClick={async () => {
+                pb.authStore.clear()
+                await qc.invalidateQueries()
+              }}
+            >
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
       <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
