@@ -11,7 +11,7 @@ Lort is a free, open-source, self-hosted feedback board, roadmap and changelog f
 |---|---|
 | Product record (users, purpose, principles) | `PRODUCT.md` |
 | Design system (tokens, rules, components) | `DESIGN.md`, plus the live Design System artifact https://claude.ai/artifact/A9Uo2hkwam4Q63WKpUhtVA |
-| Component source (React 18 + TS) | `design/components/src/*.tsx`, styles in `design/components/lort.css` |
+| Component reference (visual only, like a Figma file) | `design/components/src/*.tsx`, styles in `design/components/lort.css`. Never copied into `web/`: see 2.3 |
 | Approved page designs | Claude Design canvas https://claude.ai/artifact/EYjbK9CRgK2XvR1gFQov1v, page "Pages" (the "Directions" page holds the rejected explorations) |
 
 When this spec and a canvas artboard disagree on layout, the artboard wins. When they disagree on behaviour, this spec wins.
@@ -76,27 +76,28 @@ The Go binary starts Next, restarts it with backoff if it exits, and forwards SI
 | Path | Handler |
 |---|---|
 | `/api/*` (PocketBase REST, realtime SSE, files) | PocketBase |
-| `/api/lort/*` | Lort's custom Go endpoints (request lists and the request page, vote, triage, merge, board moves, the Skip queue, dashboard stats, board and tag ordering, board deletion, transcribe, publish, similar, widget config, health) |
+| `/api/lort/*` | Lort's custom Go endpoints (config, request lists and the request page, vote, triage, merge, board moves, the Skip queue, dashboard stats, board and tag ordering, board deletion, transcribe, publish, similar, widget config, health) |
 | `/mcp` | MCP server |
 | `/widget.js` | Embeddable widget script (served by Go, cached) |
 | `/_/` | PocketBase admin UI: disabled unless `LORT_PB_ADMIN=1` |
-| everything else | Next.js |
+| everything else | Next.js, with an `X-Lort-Config` header carrying the brand |
 
-Next never calls PocketBase from the server. The proxy adds an `X-Lort-Config` header to every page request (unpadded base64url JSON: app name, logo, primary colour, the landing-card and roadmap switches, public boards, tags, features and version), always overwriting one a visitor sent, and the root layout reads it to apply the owner's brand and favicon before first paint. All data loads in the browser through the PocketBase JS SDK and TanStack Query, against the same origin, so every page renders its real shell with its own skeleton while it loads. The browser keeps two SDK clients: `pb` holds the board user's session (`localStorage` key `lort_user`) and `pbAdmin` the superuser's (`lort_admin`). Business rules (status transitions, vote counting, merges, email and webhook fan-out) live in Go, behind `/api/lort/*` or PocketBase hooks, never in Next.
+Next never calls PocketBase from the server. The proxy always replaces `X-Lort-Config` on every page request (unpadded base64url JSON: app name, logo, primary colour, the landing-card and public-roadmap switches, public boards, tags, which features are on, and the version), so the root layout renders the owner's brand and favicon on the first paint and a visitor can't forge it. All data loads in the browser through the PocketBase JS SDK and TanStack Query, against the same origin, so every page renders its real shell with its own skeleton while it loads: the record API (guarded by hooks) creates requests and comments with images, and `/api/lort/*` handles everything with business rules. `GET /api/lort/requests/{id}` returns a request page in one response (request, images, merge target, timeline and comment `thread`), with visibility and internal notes decided in Go from the caller's token. The browser keeps two SDK clients: `pb` holds the board user's session (`localStorage` key `lort_user`) and `pbAdmin` the superuser's (`lort_admin`). Business rules (status transitions, vote counting, merges, email and webhook fan-out) live in Go, behind `/api/lort/*` or PocketBase hooks, never in Next.
 
 ### 2.3 Repo layout
 ```
 server/        Go module: main, pocketbase hooks, jobs, mail, webhooks, mcp, whisper, tls, proxy, setup CLI subcommands
 web/           Next.js (App Router, output: 'standalone') + shadcn/ui + Tailwind + Motion + Tiptap v3, pnpm;
                `pnpm start` runs the standalone server (scripts/start.mjs) the way the image does
-  components/lort/   the design-system components, ported from design/components
+  components/ui/     shadcn/ui components, added with the shadcn CLI
+  components/lort/   Lort's components (VoteSticker, StatusIcon, TriageBar…), built from components/ui and Tailwind
 docs/          Markdown docs, embedded in the Go binary and rendered at /dashboard/docs
 mcp/docs.mjs   zero-dependency stdio MCP server exposing docs/ before Lort is installed
-design/        design-system source of truth (components + lort.css)
+design/        the design: canvases and a reference build of the components (visual reference only, never copied into web/)
 Dockerfile     multi-stage: Go build → Node build (pnpm) → slim runtime (debian-slim + node + tini)
 setup.sh, setup.ps1
 ```
-Frontend rules: shadcn components are added with `pnpm dlx shadcn@latest add …`, never written from memory. The project is created with `pnpm dlx shadcn@latest init -t next`. Icons are Tabler (`@tabler/icons-react`, outline, 2px stroke); statuses and stickers use Lort's own SVG components. No Unicode glyphs as icons.
+Frontend rules: `design/` is treated like a Figma file. It shows how the app looks and behaves; its React and CSS are not production code and are never copied, ported or imported into `web/`. The UI is built with shadcn/ui components and styled with Tailwind utility classes. Use the shadcn component for anything shadcn has (button, input, textarea, switch, checkbox, badge, tabs, table, dialog, popover, dropdown menu, sheet, tooltip, command, avatar, skeleton, toast/sonner, and so on), customised through its variants and Tailwind classes; build only what shadcn lacks (the vote sticker, status icons, the triage and floating bars) from shadcn parts and Tailwind. Lort's tokens are Tailwind theme variables (`@theme` in `globals.css`), with shadcn's theme variables mapped onto them; no hand-written component CSS. shadcn components are added with `pnpm dlx shadcn@latest add …`, never written from memory. The project is created with `pnpm dlx shadcn@latest init -t next`. Icons are Tabler (`@tabler/icons-react`, outline, 2px stroke); statuses and stickers use Lort's own SVG components. No Unicode glyphs as icons.
 
 ## 3. Data model (PocketBase collections)
 
@@ -228,17 +229,17 @@ Signed-in, non-banned users can comment and reply (one level). Authors can delet
 `<script src="https://feedback.yoursite.com/widget.js" async></script>` adds a floating "Feedback" button (or binds to any element with `data-lort-feedback`). It opens an iframe modal containing the Suggest something form, with sign-in inside the iframe using `Partitioned` (CHIPS) cookies. After submitting, the widget links to the request on the board. The widget never shows the "Get your own board" card. No SSO.
 
 ### 5.6 Freshness
-Lists subscribe to PocketBase realtime (SSE). New requests appear at the top with a `primary-soft` tint that fades. A manual refresh button is rate-limited to once per 10 seconds. If the SSE connection drops, the page polls every 3 minutes until it reconnects.
+Lists subscribe to PocketBase realtime (SSE). New requests appear at the top with a `primary-soft` tint that fades. If the SSE connection drops, the page polls every 3 minutes until it reconnects. The dashboard's requests table also has a manual refresh button, rate-limited to once per 10 seconds; the public board relies on realtime alone.
 
 ### 5.7 Anti-spam
 Always on: per-IP and per-user rate limits (sign-up, request creation, comments, votes, transcription) returning 429 with a friendly toast, and a hidden honeypot field on sign-up and suggest. Optional: Cloudflare Turnstile (invisible) at sign-up.
 
 ## 6. Dashboard (`/dashboard`)
 
-Sign-in is for superusers only. The sidebar has Requests (with an "N new" badge), Roadmap, Changelog, then Docs and Settings at the bottom, then the signed-in admin with the Lort version. It collapses to a 76px icon rail (remembered per browser); in the rail the labels are hidden visually but kept for screen readers. The sidebar only shows pages that exist in the running build (Roadmap and Changelog join in Phase 2, Docs in Phase 6). Below 768px the sidebar becomes a top bar with a menu sheet.
+Sign-in is for superusers only. The sidebar has Requests (with an "N new" badge), Roadmap, Changelog, then Docs and Settings at the bottom, then the signed-in admin with the Lort version (its menu has View the board and Sign out). A dashboard session also signs the admin in on the board as their linked team profile (section 3), so their comments carry the Team badge. It collapses to a 76px icon rail (remembered per browser); in the rail the labels are hidden visually but kept for screen readers. The sidebar only shows pages that exist in the running build (Roadmap and Changelog join in Phase 2, Docs in Phase 6). Below 768px the sidebar becomes a top bar with a menu sheet.
 
 ### 6.1 Requests (`/dashboard/requests`)
-- Header: title, "142 total · 38 waiting for you" (waiting = Pending + Reviewing), a Live indicator, refresh button, and "New request" (admin creates a request, optionally on behalf of an email, in one save: see section 3).
+- Header: title, "142 total · 38 waiting for you" (waiting = Pending + Reviewing), a Live indicator, refresh button, and "New request" (opens Suggest something as the admin's board profile, optionally on behalf of an email, in one save: see section 3). The counts come from `GET /api/lort/stats`, which leaves merged requests out.
 - Filters (all in the URL; the search field follows it, and Clear filters also drops a search that hasn't reached the URL yet): search, Status (defaults to the four open statuses, summarised "Open"), Board, Tags, Visibility (On the board / Hidden), and sort (Newest, Oldest, Most upvoted, Recently updated).
 - Table columns: status (icon only, with tooltip and `aria-label`), request title with "New" and "Hidden" markers, votes, tags, date, requested by. Rows the team has not opened yet have the `primary-soft` tint and count toward the sidebar badge; opening a request sets `teamSeenAt`.
 - Infinite scroll; realtime inserts; the rate-limited refresh button.
@@ -246,7 +247,7 @@ Sign-in is for superusers only. The sidebar has Requests (with an "N new" badge)
 ### 6.2 Request (`/dashboard/requests/<id>`)
 The same layout as the public request page, plus:
 - Breadcrumb "Requests / <Board>" and "3 of 12 in Reviewing" for the current queue. The queue is the requests table's filters, carried in the request page's URL; Skip opens the next request in it.
-- Editable chips: status (opens a menu with the triage bar's moves, minus Merge and Skip, so the server's transition rules are the only rules), board (writes a `board_changed` timeline entry), tags, "add tag", and the "On the board" visibility switch.
+- Editable chips: status (opens a menu with the triage bar's moves, minus Merge and Skip, so the server's transition rules are the only rules), board (moved through `POST /api/lort/requests/{id}/board`, which adds a `board_changed` timeline entry), tags, "add tag", and the "On the board" visibility switch.
 - Composer with the Public/Internal toggle, images and mic.
 - Timeline with status changes, internal notes (note style, "Only the team sees this") and threaded comments.
 - Avatar popovers with email, join date, request and vote counts, verification state, **Copy password reset link** (works without email) and **Ban**/Unban.
@@ -413,7 +414,7 @@ whisper.cpp with the q5 quantised large-v3-turbo model. The model downloads to `
 - **Go unit tests:** status transitions and triage rules, merge (vote moving and dedupe), trending score, slug generation and stability, HMAC signing, job queue (scheduling, cancel/undo, retry, crash recovery), email gating (7-day rule, opt-outs, email off), webhook threshold firing once.
 - **Go integration tests** against a PocketBase test app: API rules, `/api/lort/*` endpoints, MCP tools per scope (read keys cannot call full tools, human-only tools absent).
 - **Vitest:** frontend logic (filters to URL, optimistic vote, primary colour contrast adjustment, composer limits).
-- **Playwright e2e:** sign up, suggest with similar suggestions, vote, comment, triage through every status with undo, roadmap drag with mouse and keyboard, changelog draft → schedule → publish, settings toggles hide features. Run in both themes; axe checks on every page.
+- **Playwright e2e:** sign up, suggest with similar suggestions, vote, comment, triage through every status with undo, roadmap drag with mouse and keyboard, changelog draft → schedule → publish, settings toggles hide features. Run in both themes; axe checks on every page. The suite runs against the real stack: `web/e2e/start.sh` builds the Go server and the Next.js standalone output and starts `lort` on a throwaway data directory, and global setup seeds boards and tags and turns Lort's rate limits off (the suite signs up more people per minute than one IP is allowed).
 - **CI:** builds the image, runs the Go and web tests, Playwright against the built container, `shellcheck setup.sh` and `PSScriptAnalyzer` on `setup.ps1`.
 
 ## 13. Build phases
@@ -423,7 +424,7 @@ Each phase ends with a working container.
 1. **Foundation:**
    - Covers: the container, setup scripts (including `--reset-admin`), the Go binary with routing and TLS, auth, boards, tags, requests, votes and comments.
    - Pages: the public board and request page, the dashboard requests table, the request page with triage and merge, and the Settings sections for Branding, Boards, Tags and Team.
-   - The design system ported into `web/components/lort`, plus skeletons for these pages.
+   - The design system rebuilt in `web/` with shadcn/ui and Tailwind (2.3), plus skeletons for these pages.
 2. **Roadmap and changelog:**
    - The public and dashboard roadmaps.
    - The changelog editor with scheduling, and the public changelog pages.
@@ -463,7 +464,7 @@ The full token tables and component rules are in `DESIGN.md`. This part fixes th
 - **Icons:** Tabler outline, 2px stroke; GitHub mark is Tabler `brand-github`.
 
 ### 14.4 Components
-Port `design/components/src` into `web/components/lort` as client components and keep the `lt-` CSS (or translate to Tailwind classes 1:1, keeping the tokens as CSS variables). Use shadcn primitives (Dialog, Popover, DropdownMenu, Command, Calendar, Sheet, Tooltip, Switch) underneath, restyled to the tokens.
+Build each component in `web/` with shadcn/ui and Tailwind, following the frontend rules in 2.3. `design/components` and the canvases show how each one looks and behaves; match that, but never copy their code or the `lt-` CSS. Where shadcn has the component (Button, Input, Textarea, Switch, Checkbox, Badge, Tabs, Table, Dialog, Popover, DropdownMenu, Command, Calendar, Sheet, Tooltip, Avatar, Skeleton, Sonner), add it with the CLI and give it Lort's look through variants and Tailwind classes. The rules below describe the result, not the reference code.
 
 | Component | Rules |
 |---|---|

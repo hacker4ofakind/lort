@@ -274,7 +274,7 @@ Flat at rest; tonal layering (ground → surface → surface-2 → surface-3) ca
 - **Card float** (`0 8px 20px rgba(0,0,0,0.35)` / `0 8px 20px rgba(60,40,30,0.12)`): small floating cards and a card being dragged.
 - **Inset small** (`inset 0 1.7px 2.55px -0.85px rgba(0,0,0,0.9)` / `inset 0 1.7px 2.55px -0.85px rgba(60,30,20,0.2)`): pressed slightly into the page along the top edge. Used on the SortTabs track, the FloatingBar, the TriageBar and toasts; layered with Float on the floating ones (`box-shadow: var(--shadow-inset-sm), var(--shadow-float)`). Containers only; buttons and cards stay flat.
 
-Each shadow has a utility class in `design/components/lort.css`: `.lt-shadow-sticker`, `.lt-shadow-float`, `.lt-shadow-card-float`, `.lt-shadow-inset-sm`.
+The reference build in `design/components/lort.css` names them `.lt-shadow-sticker`, `.lt-shadow-float`, `.lt-shadow-card-float` and `.lt-shadow-inset-sm`. In the app they are Tailwind theme shadows (`shadow-sticker`, `shadow-float`, `shadow-card-float`, `shadow-inset-sm`), not CSS classes.
 
 ### Named Rules
 **The Only-Stickers-Tilt Rule.** Voted stickers rotate −7° and the logo mark −4°. Nothing else rotates.
@@ -287,7 +287,7 @@ Pills for everything clickable (buttons, chips, tabs, inputs, nav, floating bars
 
 ## Components
 
-React 18 + TypeScript reference source for each lives in `design/components/src/` (styles in `design/components/lort.css`, classes prefixed `lt-`). The app builds its own in `web/components/lort` from shadcn/ui parts and Tailwind utilities that read the same tokens, matching the reference visually rather than copying its code. The design system artifact has a live, interactive preview and usage notes for each.
+`design/components/src/` (React, with styles in `design/components/lort.css`) and the design system artifact are a visual reference, like a Figma file: they show how each component looks and behaves. They are not production code and are never copied into the app. In `web/`, build every component with shadcn/ui (added with `pnpm dlx shadcn@latest add …`) and Tailwind utility classes, with these tokens as Tailwind theme variables. Use the shadcn component wherever one exists and give it Lort's look through its variants and classes; build only what shadcn lacks (VoteSticker, StatusIcon, TriageBar, FloatingBar) from shadcn parts and Tailwind, in `web/components/lort`. Merge class names with Lort's `cn()` from `@/lib/utils` (it knows Lort's text sizes and shadows).
 - **StatusIcon:** 16px circle; 1.5px ring in the status colour, 30% tint inside, solid fill rising from the bottom (0 / 28 / 50 / 80 / 100%), check for Completed, cross for Closed.
 - **VoteSticker:** 58px (40px compact). Empty: 2px dashed Dot Spot ring. Voted: primary fill, 3px keyline, −7° tilt, sticker shadow. The signature motion: slap on (scale 1.15 → 1 and rotate to −7° over ~220ms, springy) and peel off (160ms). Instant under reduced motion.
 - **Button:** primary / secondary / ghost / danger-text pills, 42px (32px small). One primary per view; no filled red buttons.
