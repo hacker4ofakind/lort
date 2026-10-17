@@ -34,7 +34,7 @@ Everything UserJot charges for, free and self-hosted. Plus what UserJot doesn't 
 ## Capabilities and Constraints
 
 - Six statuses, each with a custom SVG circle icon at a distinct fill level (yellow empty → orange sliver → light-blue half → purple nearly full → green full with check; red with cross). Wherever a status appears it is either icon + label or colored text, never both, never neither (table icons carry a tooltip/aria-label).
-- Boards (public/private, per-board approval), admin-managed tags, one-level comment replies, internal notes, merge, similar-request suggestions, embeddable widget.
+- Boards (public/private, per-board approval), admin-managed tags, one-level comment replies, internal notes, merge, typo-tolerant search and similar-request suggestions, embeddable widget.
 - Optional features that vanish entirely when off: email (Resend/SMTP), voice dictation (Whisper), Turnstile.
 - Custom skeleton loaders per page layout; no generic skeletons.
 - Settings is a single page split into sections.
@@ -42,7 +42,7 @@ Everything UserJot charges for, free and self-hosted. Plus what UserJot doesn't 
 ## Brand Commitments
 
 - Name: Lort. Voice: friendly and encouraging — celebrates shipping moments, warm in empty states, never corporate. Short sentences.
-- "Powered by Lort" footer link is always present on public pages; the floating "Get your own board" card is optional and links to the in-app `/lort-landing` page, whose headline uses the owner's app name.
+- "Powered by Lort" footer link is always present on public pages; the floating "Get your own board" card is optional and links to the in-app `/lort-landing` page (the GitHub repository until that page ships in Phase 6), whose headline uses the owner's app name.
 - The owner's brand (name, logo, primary color) leads on public surfaces; Lort's own identity leads on the dashboard and `/lort-landing`.
 - UserJot screenshots are layout references only; their design system, fonts, colors and copy must not be copied.
 
