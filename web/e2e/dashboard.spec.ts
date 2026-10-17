@@ -115,3 +115,30 @@ test("a request posted for someone else carries their name", async ({ page }) =>
   await page.waitForURL(/\/dashboard\/requests\/[a-z0-9]+/)
   await expect(page.getByText(`priya-${id} posted this in Features`)).toBeVisible()
 })
+
+test("clearing filters clears the search field for good", async ({ page }) => {
+  await signInAdmin(page)
+  const field = page.getByRole("searchbox", { name: "Search requests" }).or(page.getByRole("textbox", { name: "Search requests" }))
+  const none = `nothing-like-this-${unique()}`
+  await field.fill(none)
+  await page.waitForURL(new RegExp(`q=${none}`))
+  await page.getByRole("button", { name: "Clear filters" }).click()
+  await page.waitForURL((url) => !url.searchParams.has("q"))
+  await expect(field).toHaveValue("")
+  // The cleared search doesn't come back once the debounce would have fired.
+  await page.waitForTimeout(600)
+  expect(new URL(page.url()).searchParams.has("q")).toBe(false)
+  await expect(field).toHaveValue("")
+})
+
+test("the collapsed rail keeps its links' names", async ({ page }) => {
+  await signInAdmin(page)
+  await page.getByRole("button", { name: "Collapse sidebar" }).click()
+  await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible()
+  const nav = page.locator("[data-sidebar=sidebar]")
+  await expect(nav.getByRole("link", { name: "Requests" })).toBeVisible()
+  await expect(nav.getByRole("link", { name: "Settings" })).toBeVisible()
+  // The labels are for screen readers only: each item is just its icon.
+  expect((await nav.getByRole("link", { name: "Settings" }).boundingBox())!.width).toBeLessThanOrEqual(44)
+  await page.getByRole("button", { name: "Expand sidebar" }).click()
+})

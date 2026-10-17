@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useUrlSearch } from "@/lib/use-url-search"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { IconSearch } from "@tabler/icons-react"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
@@ -18,21 +18,11 @@ export function SearchField({ className, autoFocus }: { className?: string; auto
   const pathname = usePathname()
   const params = useSearchParams()
   const urlQ = onBoard(pathname) ? (params.get("q") ?? "") : ""
-  const [q, setQ] = useState(urlQ)
-  const [prevUrlQ, setPrevUrlQ] = useState(urlQ)
-  if (urlQ !== prevUrlQ) {
-    // The URL changed under us (back button, "Clear filters"): follow it.
-    setPrevUrlQ(urlQ)
-    setQ(urlQ)
-  }
-
-  useEffect(() => {
-    if (!onBoard(pathname) || q === urlQ) return
-    const t = setTimeout(() => {
-      router.replace(`${pathname}${boardSearch({ ...parseBoardFilters(params), q })}`, { scroll: false })
-    }, 300)
-    return () => clearTimeout(t)
-  }, [q, urlQ, pathname, params, router])
+  // On the board the URL follows the field 300 ms after the last key, and the field follows the
+  // URL (back button, "Clear filters").
+  const [q, setQ] = useUrlSearch(urlQ, (q) => {
+    if (onBoard(pathname)) router.replace(`${pathname}${boardSearch({ ...parseBoardFilters(params), q })}`, { scroll: false })
+  })
 
   return (
     <form

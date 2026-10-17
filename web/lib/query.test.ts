@@ -23,4 +23,17 @@ describe("patchRequest", () => {
     expect(qc.getQueryData<RequestItem[]>(keys.similar("dark"))![0].votes).toBe(4)
     expect(qc.getQueryData<RequestDetail>(keys.request("board", "a"))!.voted).toBe(true)
   })
+
+  it("also updates a single page, like the merge picker's results", () => {
+    const qc = makeQueryClient()
+    const page: Page<RequestItem> = { items: [item("a", 3), item("b", 1)], page: 1, perPage: 20, totalItems: 2 }
+    qc.setQueryData(keys.requests("team", { merge: "x" }), page)
+    qc.setQueryData(keys.requests("board", {}), { pages: [page], pageParams: [1] })
+
+    expect(() => patchRequest(qc, "a", toggledVote)).not.toThrow()
+
+    expect(qc.getQueryData<Page<RequestItem>>(keys.requests("team", { merge: "x" }))!.items[0]).toMatchObject({ votes: 4, voted: true })
+    const list = qc.getQueryData<InfiniteData<Page<RequestItem>>>(keys.requests("board", {}))!
+    expect(list.pages[0].items[0]).toMatchObject({ votes: 4, voted: true })
+  })
 })

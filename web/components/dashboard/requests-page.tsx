@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
 import { IconChevronDown, IconPlus, IconRotateClockwise, IconSearch } from "@tabler/icons-react"
@@ -30,6 +30,7 @@ import { keys } from "@/lib/query"
 import { useLiveRefresh } from "@/lib/realtime"
 import { OPEN_STATUSES, type Status } from "@/lib/status"
 import { useCooldown } from "@/lib/use-cooldown"
+import { useUrlSearch } from "@/lib/use-url-search"
 
 const SORTS: { value: TableSort; label: string }[] = [
   { value: "newest", label: "Newest first" },
@@ -53,18 +54,14 @@ export function RequestsPage() {
   const boards = useBoards()
   const [newOpen, setNewOpen] = useState(false)
   const [fresh, setFresh] = useState<string[]>([])
-  const [q, setQ] = useState(filters.q)
   const [ready, startCooldown] = useCooldown(10_000)
 
   const setFilters = (next: Partial<TableFilters>) =>
     router.replace(`${pathname}${tableSearch({ ...filters, ...next })}`, { scroll: false })
-  // Search: the URL follows the field 300 ms after the last key.
-  const urlQ = filters.q
-  useEffect(() => {
-    if (q === urlQ) return
-    const t = setTimeout(() => router.replace(`${pathname}${tableSearch({ ...parseTableFilters(new URLSearchParams(window.location.search)), q })}`, { scroll: false }), 300)
-    return () => clearTimeout(t)
-  }, [q, urlQ, pathname, router])
+  // Search: the URL follows the field 300 ms after the last key, and the field follows the URL.
+  const [q, setQ] = useUrlSearch(filters.q, (q) =>
+    router.replace(`${pathname}${tableSearch({ ...parseTableFilters(new URLSearchParams(window.location.search)), q })}`, { scroll: false })
+  )
 
   const counts = useQuery({ queryKey: keys.stats, queryFn: () => stats(pbAdmin) })
   const list = useInfiniteQuery({

@@ -1,11 +1,12 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
+import type { Comment, RequestDetail } from "@/lib/api"
 import { fileUrl } from "@/lib/files"
 import { pbAdmin, type Client } from "@/lib/pocketbase"
 
 /**
- * A file token for protected images, when the request isn't public. Tokens last a few minutes,
+ * A file token for protected images (see needsFileToken). Tokens last a few minutes,
  * so it refreshes every 90 seconds while the page is open.
  */
 export function useFileToken(client: Client, needed: boolean): string | undefined {
@@ -17,6 +18,15 @@ export function useFileToken(client: Client, needed: boolean): string | undefine
     refetchInterval: 90_000,
   })
   return token.data
+}
+
+/**
+ * Whether a request page needs a file token for its images: the request's own when it isn't
+ * public, and an internal note's always (internal notes are team-only, even on a public request).
+ */
+export function needsFileToken(d: Pick<RequestDetail, "public" | "thread">): boolean {
+  const internalImages = (cs: Comment[]): boolean => cs.some((c) => (c.internal && c.images.length > 0) || internalImages(c.replies))
+  return !d.public || internalImages(d.thread)
 }
 
 export interface RequestImagesProps {

@@ -16,10 +16,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Field, FieldLabel, FieldTitle } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Toggle } from "@/components/ui/toggle"
-import { reassign, similar } from "@/lib/api"
+import { similar } from "@/lib/api"
 import { useUser } from "@/lib/auth"
 import type { Ref } from "@/lib/config"
-import { pb, pbAdmin } from "@/lib/pocketbase"
+import { pb } from "@/lib/pocketbase"
 import { keys } from "@/lib/query"
 import { useDebounced } from "@/lib/use-debounced"
 
@@ -31,6 +31,8 @@ export interface NewRequest {
   images: File[]
   internal: boolean
   website: string
+  /** The team only: the email of the person this is posted for. */
+  onBehalf?: string
 }
 
 /**
@@ -47,6 +49,8 @@ export function newRequestPayload(v: NewRequest) {
     images: v.images,
     internal: v.internal,
     website: v.website,
+    // The server makes this person the author, with their vote, in the same transaction.
+    ...(v.onBehalf?.trim() ? { onBehalf: v.onBehalf.trim() } : {}),
   }
 }
 
@@ -105,9 +109,17 @@ function SuggestForm({ team, boards, onDone }: { team: boolean; boards: Ref[]; o
     const rec = await pb
       .collection("requests")
       .create<{ id: string; awaitingApproval: boolean }>(
-        newRequestPayload({ board, title, body: text, tags, images, internal: visibility === "internal", website })
+        newRequestPayload({
+          board,
+          title,
+          body: text,
+          tags,
+          images,
+          internal: visibility === "internal",
+          website,
+          onBehalf: team ? onBehalf : undefined,
+        })
       )
-    if (team && onBehalf.trim()) await reassign(pbAdmin, rec.id, onBehalf.trim())
     await qc.invalidateQueries({ queryKey: ["requests"] })
     if (team) await qc.invalidateQueries({ queryKey: keys.stats })
     toast(rec.awaitingApproval ? "Thanks! The team will look at it before it goes on the board." : "Posted. Thanks for the idea!")

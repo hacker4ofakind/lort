@@ -31,7 +31,7 @@ export interface TimelineProps {
   request: RequestDetail
   /** The dashboard's wording ("Luk moved this…") instead of the public "Luk from the team moved this…". */
   team?: boolean
-  /** File token for images on a request that isn't public. */
+  /** File token for protected images (needsFileToken). */
   token?: string
   /** Wraps an avatar, e.g. in the dashboard's person popover. */
   renderAvatar?: (person: Person, avatar: ReactNode) => ReactNode

@@ -15,7 +15,7 @@ import { useTriage } from "@/components/dashboard/use-triage"
 import { Bone } from "@/components/lort/bone"
 import { Composer } from "@/components/lort/composer"
 import { TriageBar } from "@/components/lort/triage-bar"
-import { useFileToken } from "@/components/request/request-images"
+import { needsFileToken, useFileToken } from "@/components/request/request-images"
 import { RequestSkeleton } from "@/components/request/request-skeleton"
 import { RequestView } from "@/components/request/request-view"
 import { useComments } from "@/components/request/use-comments"
@@ -52,7 +52,7 @@ export function TeamRequest({ id }: { id: string }) {
 
   const detail = useQuery({ queryKey: keys.request("team", id), queryFn: () => getRequest(pbAdmin, id) })
   const position = useQuery({ queryKey: keys.queue(params, id), queryFn: () => queue(pbAdmin, params, id) })
-  const token = useFileToken(pbAdmin, !!detail.data && !detail.data.public)
+  const token = useFileToken(pbAdmin, !!detail.data && needsFileToken(detail.data))
 
   // Opening a request clears its "New" marker, once per visit.
   const seen = useRef("")

@@ -1,12 +1,12 @@
 "use client"
 
-import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useRequireUser } from "@/components/board/auth-gate"
 import { getRequest, vote } from "@/lib/api"
 import { errorMessage } from "@/lib/errors"
 import { pb } from "@/lib/pocketbase"
-import { patchRequest, toggledVote } from "@/lib/query"
+import { cachedRequest, patchRequest, toggledVote } from "@/lib/query"
 
 /**
  * Toggles the signed-in user's vote with an optimistic update everywhere the request is cached,
@@ -21,15 +21,17 @@ export function useVote() {
     onMutate: async (id: string) => {
       await qc.cancelQueries({ queryKey: ["requests"] })
       await qc.cancelQueries({ queryKey: ["request"] })
-      const snapshot: Array<[QueryKey, unknown]> = [
-        ...qc.getQueriesData({ queryKey: ["requests"] }),
-        ...qc.getQueriesData({ queryKey: ["request"] }),
-      ]
+      // Only this request's vote is remembered: restoring whole cached lists on failure would
+      // undo other votes that succeeded meanwhile.
+      const before = cachedRequest(qc, id)
       patchRequest(qc, id, toggledVote)
-      return { snapshot }
+      return { before: before && { voted: before.voted, votes: before.votes } }
     },
-    onError: (err, _id, ctx) => {
-      ctx?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data))
+    onError: (err, id, ctx) => {
+      if (ctx?.before) {
+        const { voted, votes } = ctx.before
+        patchRequest(qc, id, (r) => ({ ...r, voted, votes }))
+      }
       toast(errorMessage(err, "Your vote didn't stick. Try again."))
     },
     onSuccess: (res, id) => patchRequest(qc, id, (r) => ({ ...r, voted: res.voted, votes: res.votes })),

@@ -145,10 +145,6 @@ export function moveBoard(c: Client, id: string, board: string): Promise<void> {
   return c.send(`/api/lort/requests/${id}/board`, json({ board }))
 }
 
-export function reassign(c: Client, id: string, email: string): Promise<void> {
-  return c.send(`/api/lort/requests/${id}/author`, json({ email }))
-}
-
 export function queue(c: Client, params: Record<string, string>, current: string): Promise<QueueInfo> {
   return c.send("/api/lort/queue", { query: { ...params, current } })
 }

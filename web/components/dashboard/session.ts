@@ -23,10 +23,34 @@ export function signOutAdmin() {
   pb.authStore.clear()
 }
 
-/** Links the admin's board profile into pb: from now on they comment, vote and suggest as it. */
+/**
+ * Links the admin's board profile into pb: from now on they comment, vote and suggest as it.
+ * The answer only counts for the admin session that asked: if they signed out (or someone else
+ * signed in) while it was on its way, it's dropped.
+ */
 export async function linkProfile() {
+  const session = pbAdmin.authStore.token
   const me = await teamMe(pbAdmin)
+  if (!session || pbAdmin.authStore.token !== session) return
   pb.authStore.save(me.token, me.profile as RecordModel)
+}
+
+/**
+ * Renews the board profile for the current admin session. A 401/403 signs out that session only:
+ * a late rejection mustn't end a newer one. Network errors and aborts keep it.
+ */
+export async function renewSession(): Promise<"linked" | "signed-out" | "kept"> {
+  const session = pbAdmin.authStore.token
+  try {
+    await linkProfile()
+    return "linked"
+  } catch (err) {
+    if (sessionAfterError(err) === "sign-out" && session && pbAdmin.authStore.token === session) {
+      signOutAdmin()
+      return "signed-out"
+    }
+    return "kept"
+  }
 }
 
 /**
@@ -47,14 +71,10 @@ export function useAdminSession() {
       return
     }
     let cancelled = false
-    linkProfile()
-      .then(() => qc.invalidateQueries())
-      .catch((err) => {
-        if (sessionAfterError(err) === "sign-out") {
-          signOutAdmin()
-          if (!cancelled) router.replace(`/dashboard/login?next=${encodeURIComponent(pathname)}`)
-        }
-      })
+    void renewSession().then((outcome) => {
+      if (outcome === "linked") void qc.invalidateQueries()
+      else if (outcome === "signed-out" && !cancelled) router.replace(`/dashboard/login?next=${encodeURIComponent(pathname)}`)
+    })
     return () => {
       cancelled = true
     }

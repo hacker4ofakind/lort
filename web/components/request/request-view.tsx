@@ -23,7 +23,7 @@ export interface RequestViewProps {
   titleAside?: ReactNode
   /** The composer, or the "sign in to comment" card. */
   composer: ReactNode
-  /** File token for a request that isn't public (useFileToken). */
+  /** File token for protected images (needsFileToken, useFileToken). */
   token?: string
   renderAvatar?: (person: Person, avatar: ReactNode) => ReactNode
   canReply: boolean
