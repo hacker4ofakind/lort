@@ -366,3 +366,37 @@ func TestVoteDeleteAndRecountAreAtomic(t *testing.T) {
 		t.Errorf("upvoteCount = %d after a standalone vote delete, want 0", r.GetInt("upvoteCount"))
 	}
 }
+
+func TestTeamShowingARequestApprovesIt(t *testing.T) {
+	f := newFixture(t)
+	r := testutil.Request(t, f.app, f.approval, f.mara, "Crash on paste", "pending", 0)
+	r.Set("visible", false)
+	r.Set("awaitingApproval", true)
+	if err := f.app.Save(r); err != nil {
+		t.Fatal(err)
+	}
+	su := testutil.Superuser(t, f.app, "root@example.com")
+	f.scenario(t, tests.ApiScenario{Method: http.MethodPatch, URL: "/api/collections/requests/records/" + r.Id,
+		Headers: map[string]string{"Authorization": testutil.Token(t, su)}, Body: strings.NewReader(`{"visible":true}`),
+		ExpectedStatus: 200, ExpectedContent: []string{`"visible":true`, `"awaitingApproval":false`}}, nil)
+}
+
+// The JS SDK sends the non-file fields of a multipart create as JSON in "@jsonPayload", so an
+// admin's internal flag arrives as a real boolean even with an image attached.
+func TestAdminInternalRequestWithImage(t *testing.T) {
+	f := newFixture(t)
+	body := &bytes.Buffer{}
+	mp := multipart.NewWriter(body)
+	_ = mp.WriteField("@jsonPayload", `{"board":"`+f.features.Id+`","title":"Roadmap notes","internal":true}`)
+	w, err := mp.CreateFormFile("images", "notes.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = w.Write(png)
+	if err := mp.Close(); err != nil {
+		t.Fatal(err)
+	}
+	f.scenario(t, tests.ApiScenario{Method: http.MethodPost, URL: "/api/collections/requests/records", Body: body,
+		Headers:        map[string]string{"Authorization": testutil.Token(t, f.admin), "Content-Type": mp.FormDataContentType()},
+		ExpectedStatus: 200, ExpectedContent: []string{`"visible":false`, `"awaitingApproval":false`, `"images":["`}}, nil)
+}

@@ -121,3 +121,18 @@ func TestInviteKeepsVerifiedProfileCredentials(t *testing.T) {
 		t.Error("a verified owner should keep their sign-in")
 	}
 }
+
+func TestUserByEmail(t *testing.T) {
+	app := testutil.NewApp(t)
+	mara := testutil.User(t, app, "mara@example.com")
+	if u, err := team.UserByEmail(app, " mara@example.com "); err != nil || u.Id != mara.Id {
+		t.Fatalf("existing = %v, %v", u, err)
+	}
+	u, err := team.UserByEmail(app, "priya@example.com")
+	if err != nil || u.Verified() || u.GetString("name") != "priya" {
+		t.Fatalf("new = %v, %v", u, err)
+	}
+	if _, err := team.UserByEmail(app, "not an email"); !errors.Is(err, team.ErrBadEmail) {
+		t.Errorf("bad email err = %v", err)
+	}
+}

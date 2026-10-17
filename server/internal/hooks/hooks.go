@@ -15,7 +15,7 @@ func Register(app core.App, svc *requests.Service) {
 	app.OnRecordCreateRequest("requests").BindFunc(func(e *core.RecordRequestEvent) error {
 		return onRequestCreate(e, svc)
 	})
-	app.OnRecordUpdateRequest("requests").BindFunc(rejectBanned)
+	app.OnRecordUpdateRequest("requests").BindFunc(onRequestUpdate)
 	app.OnRecordCreateRequest("comments").BindFunc(onCommentCreate)
 	app.OnRecordDeleteRequest("boards").BindFunc(onBoardDelete)
 	// Keep upvoteCount true when votes go away without ToggleVote, e.g. when a deleted
@@ -66,6 +66,15 @@ func rejectBanned(e *core.RecordRequestEvent) error {
 		return e.ForbiddenError("Your account can't post on this board.", nil)
 	}
 	return e.Next()
+}
+
+// onRequestUpdate rejects banned authors, and when the team puts a request on the board it is
+// no longer waiting for approval.
+func onRequestUpdate(e *core.RecordRequestEvent) error {
+	if e.HasSuperuserAuth() && e.Record.GetBool("visible") {
+		e.Record.Set("awaitingApproval", false)
+	}
+	return rejectBanned(e)
 }
 
 func onRequestCreate(e *core.RecordRequestEvent, svc *requests.Service) error {

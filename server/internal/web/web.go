@@ -18,8 +18,12 @@ const unavailable = `<!doctype html><meta charset="utf-8"><title>Starting up</ti
 <body style="font-family:system-ui;background:#1a1716;color:#f5efea;display:grid;place-items:center;height:100vh;margin:0">
 <p>The board is starting up. Refresh in a few seconds.</p>`
 
-// Proxy returns a handler that forwards everything to target.
-func Proxy(target *url.URL) func(*core.RequestEvent) error {
+// ConfigHeader carries the board's public config to Next.js. The proxy always overwrites it,
+// so a visitor can't send their own.
+const ConfigHeader = "X-Lort-Config"
+
+// Proxy returns a handler that forwards everything to target, with config() in ConfigHeader.
+func Proxy(target *url.URL, config func() string) func(*core.RequestEvent) error {
 	p := httputil.NewSingleHostReverseProxy(target)
 	p.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, _ error) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -28,6 +32,10 @@ func Proxy(target *url.URL) func(*core.RequestEvent) error {
 		_, _ = w.Write([]byte(unavailable))
 	}
 	return func(e *core.RequestEvent) error {
+		e.Request.Header.Del(ConfigHeader)
+		if v := config(); v != "" {
+			e.Request.Header.Set(ConfigHeader, v)
+		}
 		p.ServeHTTP(e.Response, e.Request)
 		return nil
 	}
@@ -49,7 +57,9 @@ func Supervise(ctx context.Context, cmd []string, log *slog.Logger) {
 		if time.Since(started) > time.Minute {
 			backoff = time.Second
 		}
-		log.Warn("web server exited, restarting", "err", err, "in", backoff)
+		// A string, not a time.Duration: PocketBase's log store can't encode a Duration and
+		// would drop the whole line.
+		log.Warn("web server exited, restarting", "err", err, "in", backoff.String())
 		select {
 		case <-ctx.Done():
 			return

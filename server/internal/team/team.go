@@ -3,6 +3,7 @@ package team
 
 import (
 	"errors"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -209,4 +210,32 @@ func SetBanned(app core.App, userID string, banned bool) error {
 	}
 	u.Set("banned", banned)
 	return app.Save(u)
+}
+
+// ErrBadEmail is returned for an address that can't be an email.
+var ErrBadEmail = errors.New("enter an email address like name@example.com")
+
+// UserByEmail returns the board user with this email, creating an unverified account with a
+// random password when there is none. The team uses it to post a request for someone; that
+// person can claim the account later through a password reset link.
+func UserByEmail(app core.App, email string) (*core.Record, error) {
+	addr, err := mail.ParseAddress(strings.TrimSpace(email))
+	if err != nil || addr.Name != "" {
+		return nil, ErrBadEmail
+	}
+	if u, err := app.FindAuthRecordByEmail("users", addr.Address); err == nil {
+		return u, nil
+	}
+	c, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		return nil, err
+	}
+	u := core.NewRecord(c)
+	u.SetEmail(addr.Address)
+	u.SetRandomPassword()
+	u.Set("name", NameFromEmail(addr.Address))
+	if err := app.Save(u); err != nil {
+		return nil, err
+	}
+	return u, nil
 }

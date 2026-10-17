@@ -11,6 +11,7 @@ import (
 	"github.com/hacker4ofakind/lort/server/internal/api"
 	"github.com/hacker4ofakind/lort/server/internal/config"
 	"github.com/hacker4ofakind/lort/server/internal/requests"
+	"github.com/hacker4ofakind/lort/server/internal/site"
 	"github.com/hacker4ofakind/lort/server/internal/testutil"
 )
 
@@ -25,7 +26,7 @@ func newFixture(t testing.TB) *fixture {
 	app := testutil.NewApp(t)
 	svc := requests.New(app)
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-		api.Register(se, api.Deps{Svc: svc, Cfg: config.Config{URL: "https://f.example"}})
+		api.Register(se, api.Deps{Svc: svc, Cfg: config.Config{URL: "https://f.example"}, Site: site.NewCache(app)})
 		return se.Next()
 	})
 	f := &fixture{app: app}
@@ -92,4 +93,37 @@ func TestTeamInviteAndResetLink(t *testing.T) {
 		ExpectedStatus: 200, ExpectedContent: []string{`https://f.example/reset-password?token=`}})
 	f.run(t, tests.ApiScenario{Method: http.MethodGet, URL: "/api/lort/users/" + f.mara.Id, Headers: auth,
 		ExpectedStatus: 200, ExpectedContent: []string{`"email":"mara@example.com"`, `"requests":1`}})
+}
+
+func TestRequestDetailEndpoint(t *testing.T) {
+	f := newFixture(t)
+	f.run(t, tests.ApiScenario{Method: http.MethodGet, URL: "/api/lort/requests/" + f.req.Id, ExpectedStatus: 200,
+		ExpectedContent: []string{`"title":"Dark mode for the editor"`, `"thread":[]`, `"comments":0`, `"public":true`}})
+	f.run(t, tests.ApiScenario{Method: http.MethodGet, URL: "/api/lort/requests/missing", ExpectedStatus: 404,
+		ExpectedContent: []string{"That request is gone."}})
+	f.run(t, tests.ApiScenario{Method: http.MethodGet, URL: "/api/lort/requests/" + f.req.Id,
+		Headers: map[string]string{"Authorization": testutil.Token(t, f.su)}, ExpectedStatus: 200,
+		ExpectedContent: []string{`"voted":false`, `"new":true`}})
+}
+
+func TestDashboardEndpoints(t *testing.T) {
+	f := newFixture(t)
+	auth := map[string]string{"Authorization": testutil.Token(t, f.su)}
+	bugs := testutil.Board(t, f.app, "Bugs", true, false)
+
+	f.run(t, tests.ApiScenario{Method: http.MethodGet, URL: "/api/lort/stats", ExpectedStatus: 401, ExpectedContent: []string{`"data":{}`}})
+	f.run(t, tests.ApiScenario{Method: http.MethodGet, URL: "/api/lort/stats", Headers: auth, ExpectedStatus: 200,
+		ExpectedContent: []string{`"total":1`, `"waiting":1`, `"new":1`}})
+	f.run(t, tests.ApiScenario{Method: http.MethodGet, URL: "/api/lort/queue?status=reviewing&current=" + f.req.Id, Headers: auth,
+		ExpectedStatus: 200, ExpectedContent: []string{`"position":1`, `"total":1`, `"next":""`}})
+	f.run(t, tests.ApiScenario{Method: http.MethodPost, URL: "/api/lort/requests/" + f.req.Id + "/board", Headers: auth,
+		Body: strings.NewReader(`{"board":"` + bugs.Id + `"}`), ExpectedStatus: 204})
+	f.run(t, tests.ApiScenario{Method: http.MethodPost, URL: "/api/lort/requests/" + f.req.Id + "/author", Headers: auth,
+		Body: strings.NewReader(`{"email":"nope"}`), ExpectedStatus: 400, ExpectedContent: []string{"email address"}})
+	f.run(t, tests.ApiScenario{Method: http.MethodPost, URL: "/api/lort/order/boards", Headers: auth,
+		Body: strings.NewReader(`{"ids":["` + bugs.Id + `","` + f.board.Id + `"]}`), ExpectedStatus: 204})
+	f.run(t, tests.ApiScenario{Method: http.MethodDelete, URL: "/api/lort/boards/" + bugs.Id, Headers: auth,
+		ExpectedStatus: 400, ExpectedContent: []string{"Move this board"}})
+	f.run(t, tests.ApiScenario{Method: http.MethodDelete, URL: "/api/lort/boards/" + bugs.Id + "?moveTo=" + f.board.Id, Headers: auth,
+		ExpectedStatus: 204})
 }
