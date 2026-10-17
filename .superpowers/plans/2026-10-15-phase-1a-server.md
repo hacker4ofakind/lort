@@ -42,6 +42,16 @@ Two review rounds changed the code after this plan was written. The code blocks 
 - **Hooks (Task 6):** request creation runs `e.Next()` and `AfterCreate` in one transaction, so PocketBase sends the response after the commit. A new `OnRecordDeleteExecute("votes")` hook runs the delete and `Recount` in one transaction that it opens itself, because PocketBase's own delete handler (priority 99) commits before returning.
 - **Tests:** new cases cover each of these, including anonymous access to authorless records, merged private requests, board moves, protected images, cascaded and failed recounts, atomic creation with and without an image, vote access, trending leaving `updated` alone, and invite credential revocation.
 
+## Changes in Phase 1B (PR #4)
+
+Phase 1B extended this server; its plan (`2026-10-16-phase-1b-web.md`) has the details. In short:
+
+- **Search (Task 4):** `ftsQuery` is replaced by a typo-tolerant query built from the FTS5 vocabulary (`requests/search.go`, the `requests_fts_vocab` table), and `filter` (shared by `List` and the new `Queue`) returns an error.
+- **Hooks (Task 6):** request creation accepts `onBehalf` from team profiles; deleting a comment deletes its replies; when the team makes a request visible it stops awaiting approval.
+- **Schema (Task 2):** the logo field has a `64x64` thumb for the favicon.
+- **Endpoints (Task 7):** `GET /api/lort/config` serves `site.Config` from a cache that the proxy also sends to Next in `X-Lort-Config`; new endpoints for the request page, board moves, reassigning, the queue, stats, ordering and board deletion.
+- **Proxy (Task 8):** `web.Proxy(target, config)` sets that header; the supervisor logs its backoff as a string, and its test passes on Windows.
+
 ## File structure
 
 ```

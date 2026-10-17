@@ -1,9 +1,7 @@
 package requests
 
 import (
-	"strings"
 	"time"
-	"unicode"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -67,6 +65,30 @@ func (s *Service) List(q Query, viewer *core.Record, team bool) (Page, error) {
 	if q.Page < 1 {
 		q.Page = 1
 	}
+	base, err := s.filter(q, viewer, team)
+	if err != nil {
+		return Page{}, err
+	}
+
+	var total int
+	if err := base.Select("count(*)").Row(&total); err != nil {
+		return Page{}, err
+	}
+
+	var ids []string
+	err = base.Select("r.id").OrderBy(order(q.Sort)...).Limit(int64(q.PerPage)).Offset(int64((q.Page - 1) * q.PerPage)).Column(&ids)
+	if err != nil {
+		return Page{}, err
+	}
+	items, err := s.items(ids, viewer, team)
+	if err != nil {
+		return Page{}, err
+	}
+	return Page{Items: items, Page: q.Page, PerPage: q.PerPage, TotalItems: total}, nil
+}
+
+// filter is the FROM and WHERE shared by List and Queue.
+func (s *Service) filter(q Query, viewer *core.Record, team bool) (*dbx.SelectQuery, error) {
 	where := []dbx.Expression{dbx.HashExp{"r.mergedInto": ""}}
 	if !team {
 		public := dbx.And(dbx.HashExp{"r.visible": true}, dbx.NewExp("b.isPublic = 1"))
@@ -96,36 +118,76 @@ func (s *Service) List(q Query, viewer *core.Record, team bool) (Page, error) {
 		}
 		where = append(where, dbx.Or(ors...))
 	}
-	if m := ftsQuery(q.Search); m != "" {
+	if words := searchWords(q.Search); len(words) > 0 {
+		var vocab []string
+		for _, w := range words {
+			if maxEdits(w) > 0 {
+				// The index's distinct (stemmed) words, for typo matches.
+				if err := s.App.DB().NewQuery("SELECT term FROM requests_fts_vocab").Column(&vocab); err != nil {
+					return nil, err
+				}
+				break
+			}
+		}
+		m := searchQuery(q.Search, vocab)
 		where = append(where, dbx.NewExp("r.rowid IN (SELECT rowid FROM requests_fts WHERE requests_fts MATCH {:fts})", dbx.Params{"fts": m}))
 	}
+	return s.App.DB().Select().From("requests r").InnerJoin("boards b", dbx.NewExp("b.id = r.board")).Where(dbx.And(where...)), nil
+}
 
-	base := s.App.DB().Select().From("requests r").InnerJoin("boards b", dbx.NewExp("b.id = r.board")).Where(dbx.And(where...))
-
-	var total int
-	if err := base.Select("count(*)").Row(&total); err != nil {
-		return Page{}, err
+// order is the ORDER BY for a sort name; trending is the default.
+func order(sort string) []string {
+	switch sort {
+	case "newest":
+		return []string{"r.created DESC"}
+	case "oldest":
+		return []string{"r.created ASC"}
+	case "top":
+		return []string{"r.upvoteCount DESC", "r.created DESC"}
+	case "updated":
+		return []string{"r.updated DESC"}
 	}
+	return []string{"r.trendScore DESC", "r.created DESC"}
+}
 
-	order := map[string][]string{
-		"newest":  {"r.created DESC"},
-		"oldest":  {"r.created ASC"},
-		"top":     {"r.upvoteCount DESC", "r.created DESC"},
-		"updated": {"r.updated DESC"},
-	}[q.Sort]
-	if order == nil {
-		order = []string{"r.trendScore DESC", "r.created DESC"}
+// QueueInfo is where a request sits in the dashboard's current filtered list.
+type QueueInfo struct {
+	Position int    `json:"position"` // 1-based; 0 when the request is not in the list
+	Total    int    `json:"total"`
+	Next     string `json:"next"` // the request Skip opens; "" at the end of the list
+}
+
+// queueMax caps how many ids Queue reads; Skip past it starts again from the top.
+const queueMax = 1000
+
+// Queue finds current in the team's list for q and the request after it. When current has
+// left the list (its status changed), Next is the first request of the list.
+func (s *Service) Queue(q Query, current string) (QueueInfo, error) {
+	var info QueueInfo
+	base, err := s.filter(q, nil, true)
+	if err != nil {
+		return info, err
+	}
+	if err := base.Select("count(*)").Row(&info.Total); err != nil {
+		return info, err
 	}
 	var ids []string
-	err := base.Select("r.id").OrderBy(order...).Limit(int64(q.PerPage)).Offset(int64((q.Page - 1) * q.PerPage)).Column(&ids)
-	if err != nil {
-		return Page{}, err
+	if err := base.Select("r.id").OrderBy(order(q.Sort)...).Limit(queueMax).Column(&ids); err != nil {
+		return info, err
 	}
-	items, err := s.items(ids, viewer, team)
-	if err != nil {
-		return Page{}, err
+	for i, id := range ids {
+		if id == current {
+			info.Position = i + 1
+			if i+1 < len(ids) {
+				info.Next = ids[i+1]
+			}
+			return info, nil
+		}
 	}
-	return Page{Items: items, Page: q.Page, PerPage: q.PerPage, TotalItems: total}, nil
+	if len(ids) > 0 && ids[0] != current {
+		info.Next = ids[0]
+	}
+	return info, nil
 }
 
 // Similar finds up to limit public, open requests whose title or body match text.
@@ -210,24 +272,6 @@ func (s *Service) items(ids []string, viewer *core.Record, team bool) ([]Item, e
 		out = append(out, it)
 	}
 	return out, nil
-}
-
-// ftsQuery turns free text into a safe FTS5 prefix query: `"dark"* "mode"*`.
-func ftsQuery(text string) string {
-	words := strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-	})
-	parts := make([]string, 0, len(words))
-	for _, w := range words {
-		if len(w) < 2 {
-			continue
-		}
-		parts = append(parts, `"`+w+`"*`)
-		if len(parts) == 8 {
-			break
-		}
-	}
-	return strings.Join(parts, " ")
 }
 
 func anys(ss []string) []any {

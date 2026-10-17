@@ -260,7 +260,7 @@ Warm, low-chroma neutrals with one accent the board owner chooses, plus six stat
 ## Layout
 
 - Public board: top bar (logo + app name left; Feedback / Roadmap / Changelog pills; search and avatar right), one centred column (max 860px), 32px gutters on desktop and 24px on phones, `space-3` between cards, 140px bottom padding so content clears the floating bar.
-- Dashboard: collapsible sidebar (244px expanded) on Sunken Ground, content centred at max 820px with 40px padding, triage bar floating at the bottom centre of the content area.
+- Dashboard: collapsible sidebar (244px expanded, a 76px rail of icons when collapsed, its labels kept for screen readers) on Sunken Ground, content centred at max 820px with 40px padding, triage bar floating at the bottom centre of the content area.
 - Phones: the floating bar compacts to sort tabs + one filter button (bottom sheet) + a round 48px primary "+".
 - Spacing steps: 4, 8, 12, 16, 20, 24, 32, 40, 56px.
 
@@ -287,7 +287,7 @@ Pills for everything clickable (buttons, chips, tabs, inputs, nav, floating bars
 
 ## Components
 
-`design/components/src/` (React, with styles in `design/components/lort.css`) and the design system artifact are a visual reference, like a Figma file: they show how each component looks and behaves. They are not production code and are never copied into the app. In `web/`, build every component with shadcn/ui (added with `pnpm dlx shadcn@latest add …`) and Tailwind utility classes, with these tokens as Tailwind theme variables. Use the shadcn component wherever one exists and give it Lort's look through its variants and classes; build only what shadcn lacks (VoteSticker, StatusIcon, TriageBar, FloatingBar) from shadcn parts and Tailwind. Merge class names with shadcn's `cn()`.
+`design/components/src/` (React, with styles in `design/components/lort.css`) and the design system artifact are a visual reference, like a Figma file: they show how each component looks and behaves. They are not production code and are never copied into the app. In `web/`, build every component with shadcn/ui (added with `pnpm dlx shadcn@latest add …`) and Tailwind utility classes, with these tokens as Tailwind theme variables. Use the shadcn component wherever one exists and give it Lort's look through its variants and classes; build only what shadcn lacks (VoteSticker, StatusIcon, TriageBar, FloatingBar) from shadcn parts and Tailwind, in `web/components/lort`. Merge class names with Lort's `cn()` from `@/lib/utils` (it knows Lort's text sizes and shadows).
 - **StatusIcon:** 16px circle; 1.5px ring in the status colour, 30% tint inside, solid fill rising from the bottom (0 / 28 / 50 / 80 / 100%), check for Completed, cross for Closed.
 - **VoteSticker:** 58px (40px compact). Empty: 2px dashed Dot Spot ring. Voted: primary fill, 3px keyline, −7° tilt, sticker shadow. The signature motion: slap on (scale 1.15 → 1 and rotate to −7° over ~220ms, springy) and peel off (160ms). Instant under reduced motion.
 - **Button:** primary / secondary / ghost / danger-text pills, 42px (32px small). One primary per view; no filled red buttons.
@@ -300,7 +300,8 @@ Pills for everything clickable (buttons, chips, tabs, inputs, nav, floating bars
 - **InternalNote:** note-bg, 2px dashed note-border, "Only the team sees this".
 - **Avatar:** picture or initial on a warm fill picked from the name; keyline on public pages; primary ring for team members.
 - **FilterMenu:** multi-select drop-up behind a secondary button, custom checkboxes, Clear at the bottom; summary text on the trigger.
-- **Toast:** past-tense confirmation with at most one action; undo toasts draw a 60-second countdown bar in primary.
+- **Toast:** past-tense confirmation with at most one action; undo toasts draw a 60-second countdown bar in primary. 420px wide, message and actions on one row.
+- **Dialog:** modal radius (22px) on Card Surface with Float; its buttons sit in the dialog's own padding, with no separate footer band.
 
 ## Do's and Don'ts
 

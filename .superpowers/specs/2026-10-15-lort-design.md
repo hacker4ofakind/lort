@@ -76,18 +76,19 @@ The Go binary starts Next, restarts it with backoff if it exits, and forwards SI
 | Path | Handler |
 |---|---|
 | `/api/*` (PocketBase REST, realtime SSE, files) | PocketBase |
-| `/api/lort/*` | Lort's custom Go endpoints (config, the request page, vote, triage, merge, board moves, dashboard stats, transcribe, publish, similar, widget config, health) |
+| `/api/lort/*` | Lort's custom Go endpoints (config, request lists and the request page, vote, triage, merge, board moves, the Skip queue, dashboard stats, board and tag ordering, board deletion, transcribe, publish, similar, widget config, health) |
 | `/mcp` | MCP server |
 | `/widget.js` | Embeddable widget script (served by Go, cached) |
 | `/_/` | PocketBase admin UI: disabled unless `LORT_PB_ADMIN=1` |
 | everything else | Next.js, with an `X-Lort-Config` header carrying the brand |
 
-The proxy always replaces `X-Lort-Config` (base64 JSON: app name, logo, primary colour, the landing-card and public-roadmap switches, and which features are on), so server components render the owner's brand on the first paint without asking PocketBase, and a visitor can't forge it. The browser talks to the same origin with the PocketBase JS SDK: the record API (guarded by hooks) to create requests and comments with images, and `/api/lort/*` for everything with business rules. `GET /api/lort/requests/{id}` returns a request page in one response (request, images, merge target, timeline and comment `thread`), with visibility and internal notes decided in Go from the caller's token. Business rules (status transitions, vote counting, merges, email and webhook fan-out) live in Go, behind `/api/lort/*` or PocketBase hooks, never in Next.
+Next never calls PocketBase from the server. The proxy always replaces `X-Lort-Config` on every page request (unpadded base64url JSON: app name, logo, primary colour, the landing-card and public-roadmap switches, public boards, tags, which features are on, and the version), so the root layout renders the owner's brand and favicon on the first paint and a visitor can't forge it. All data loads in the browser through the PocketBase JS SDK and TanStack Query, against the same origin, so every page renders its real shell with its own skeleton while it loads: the record API (guarded by hooks) creates requests and comments with images, and `/api/lort/*` handles everything with business rules. `GET /api/lort/requests/{id}` returns a request page in one response (request, images, merge target, timeline and comment `thread`), with visibility and internal notes decided in Go from the caller's token. The browser keeps two SDK clients: `pb` holds the board user's session (`localStorage` key `lort_user`) and `pbAdmin` the superuser's (`lort_admin`). Business rules (status transitions, vote counting, merges, email and webhook fan-out) live in Go, behind `/api/lort/*` or PocketBase hooks, never in Next.
 
 ### 2.3 Repo layout
 ```
 server/        Go module: main, pocketbase hooks, jobs, mail, webhooks, mcp, whisper, tls, proxy, setup CLI subcommands
-web/           Next.js (App Router, output: 'standalone') + shadcn/ui + Tailwind + Motion + Tiptap v3, pnpm
+web/           Next.js (App Router, output: 'standalone') + shadcn/ui + Tailwind + Motion + Tiptap v3, pnpm;
+               `pnpm start` runs the standalone server (scripts/start.mjs) the way the image does
   components/ui/     shadcn/ui components, added with the shadcn CLI
   components/lort/   Lort's components (VoteSticker, StatusIcon, TriageBar…), built from components/ui and Tailwind
 docs/          Markdown docs, embedded in the Go binary and rendered at /dashboard/docs
@@ -118,12 +119,16 @@ Frontend rules: `design/` is treated like a Figma file. It shows how the app loo
 
 Admins are PocketBase superusers. Each superuser is linked by email to a `users` record with `isAdmin=true`, which is what their public comments and votes are attached to (shown with a Team badge). Only superusers can sign in to `/dashboard`.
 
-Access rules: public collections are readable by anyone for public boards and visible requests. Requests and comments are created through PocketBase's record API (so image uploads work natively), guarded by API rules and Go hooks that force the author, status, visibility and counts and enforce bans, the honeypot, approval boards and one-level replies. Votes, triage, merges and team actions go through `/api/lort/*`. Admins act on the public board as their linked `users` profile: `GET /api/lort/team/me` gives the dashboard a token for it.
+Access rules: public collections are readable by anyone for public boards and visible requests. Requests and comments are created through PocketBase's record API (so image uploads work natively), guarded by API rules and Go hooks that force the author, status, visibility and counts and enforce bans, the honeypot, approval boards and one-level replies. Votes, triage, merges and team actions go through `/api/lort/*`. Admins act on the public board as their linked `users` profile: `GET /api/lort/team/me` gives the dashboard a token for it. The dashboard renews it on every load, for the admin session that asked only: an answer that arrives after that session signed out is dropped, and only a 401 or 403 for that same session signs the admin out (aborted requests and network errors keep the session).
 
 Rule details that matter for security:
 - "Your own record" rules always check `@request.auth.id != ''` as well as the author, because deleting an account empties its `author` fields and an empty author would otherwise match an anonymous visitor.
 - Authors can edit the title, body, images and tags of their own request while it is Pending. They can't change its board: boards decide visibility and approval, so moving a request is a team action (the board chip on the dashboard, which writes a `board_changed` timeline entry).
 - A request, its author's vote and its "created" timeline entry are saved in one transaction, and the API reply waits for the commit, so it carries the real vote count.
+- The team can post a request for someone who asked: the create carries `onBehalf` (an email). The create hook finds that user, or creates an unverified one, and makes them the author, with their vote and the "created" entry, in the same transaction; a bad email saves nothing. Only team profiles may send it.
+- When the team makes a request visible, it stops awaiting approval.
+- Deleting a top-level comment deletes its replies in the same transaction, on every route (`parent` is a text field, so PocketBase has no cascade for it).
+- Internal comments' images are team-only even on a public request, so the dashboard asks for a superuser file token whenever the thread holds one.
 
 ## 4. Statuses, triage and merging
 
@@ -166,7 +171,7 @@ The public site carries the owner's brand: app name, logo and primary colour. "L
 - **`/feedback`** (the board, also `/`):
   - Headline "Got an idea for <App>?" and an encouraging intro.
   - One column of request cards.
-  - Top-bar search uses FTS5 over title and body.
+  - Top-bar search uses FTS5 over title and body and forgives typos: every word must match, either as a prefix or as any indexed word within one edit (two from 8 letters; swapped neighbours count as one edit). Words under 4 letters only match as prefixes. The field follows the URL (back and forward, Clear filters).
   - The floating bar holds:
     - Trending/Newest sort tabs.
     - A Board drop-up, hidden when there is only one public board.
@@ -185,7 +190,7 @@ The public site carries the owner's brand: app name, logo and primary colour. "L
   - Read-only, with three columns: Planned, In progress and Completed.
   - Each item shows a read-only sticker, title, board and a "Planned 3 weeks ago" style line.
   - The Completed column shows the last 30 days, with a "View all N shipped" link that opens a paginated list.
-  - When the roadmap is turned off in Settings, the nav pill disappears and `/roadmap` shows a friendly "No public roadmap yet" message.
+  - When the roadmap is turned off in Settings, the nav pill disappears and `/roadmap` shows a friendly "No public roadmap yet" message. The nav only ever shows pages that exist in the running build (Roadmap and Changelog join in Phase 2).
 - **`/changelog`:**
   - Posts are listed newest first, each with its date, label chips, title and excerpt.
   - A label filter (All, New, Improved, Fixed) lives in the URL.
@@ -195,10 +200,12 @@ The public site carries the owner's brand: app name, logo and primary colour. "L
   - Share has a copy-link action, plus an Open Graph image: the cover, or a generated card from the title.
 - **`/lort-landing`:** Lort's own landing page (section 14.6).
 - **Sign up, sign in, verify and reset:**
+  - They happen in dialogs, not pages: the account dialog opens from the top bar, from a sticker and inside Suggest something. The only auth pages are `/reset-password` (where the team's "Copy password reset link" points) and the dashboard's sign-in and invite pages.
   - Sign up asks for email and password only.
   - When email is on, sign-up is followed by "Check your inbox", with Resend and "Skip for now" ("You can still suggest and vote. You just won't get emails.").
   - When email is off, there is no verify step and no reset-by-email.
-- **Profile dialog** (opened from the avatar):
+- **Account menu** (opened from the avatar): name and email, "Your profile", "Dashboard" for team members, and Sign out.
+- **Profile dialog** ("Your profile"):
   - Name and avatar.
   - Notification switches for "It shipped", "Changelog" and "Replies from the team", hidden when email is off.
   - Sign out.
@@ -206,17 +213,17 @@ The public site carries the owner's brand: app name, logo and primary colour. "L
 ### 5.2 Suggest something (modal)
 Opened from the floating bar, the phone "+", or the widget. It requires sign-in; a signed-out visitor gets the sign-in/up step inside the modal and returns to the form.
 - **Board** pills (hidden with one public board).
-- **Title**, with similar-request suggestions after 3 characters (debounced 300 ms, FTS5 over title + body, up to 3 results). Each suggestion shows status, title, board and a live vote sticker ("Is it one of these? A dot counts the same as a new post.").
+- **Title**, with similar-request suggestions after 3 characters (debounced 300 ms, the board's typo-tolerant search over title + body, up to 3 results). Each suggestion shows status, title, board and a live vote sticker ("Is it one of these? A dot counts the same as a new post.").
 - **Tags** (optional), picked from the admin list.
 - **Details**: the Composer, with images (≤3, 5 MB each) and the mic when voice is on. Its send button submits the whole form. For admins the Composer also shows the Public/Internal toggle; Internal creates the request hidden from the public board.
 - On a "Needs approval" board the request is created hidden and awaiting approval.
 - The author's vote is added automatically.
 
 ### 5.3 Votes
-One vote per user per request, toggled by the sticker. Signed-out visitors who click a sticker get the sign-in step and the vote is applied after. Optimistic UI with rollback on error. Votes on Closed or merged requests are not possible (sticker becomes static). People can only vote on requests they can see: public ones, their own, or any request for team members; anything else answers "not found".
+One vote per user per request, toggled by the sticker. Signed-out visitors who click a sticker get the sign-in step and the vote is applied after. Optimistic UI everywhere the request is cached; on error each cached copy (lists, the detail page) goes back to its own previous vote fields and every other request is left alone. One vote per request is in flight at a time: clicks on it while its vote is on the way are ignored, so a late answer can't overwrite a newer one. Votes on Closed or merged requests are not possible (sticker becomes static). People can only vote on requests they can see: public ones, their own, or any request for team members; anything else answers "not found".
 
 ### 5.4 Comments
-Signed-in, non-banned users can comment and reply (one level). Authors can delete their own comments; admins can delete any. Admin public comments email the request author and earlier commenters (category "Replies from the team"). Internal comments are visible to the team only and never trigger email or the public webhook payload.
+Signed-in, non-banned users can comment and reply (one level). Authors can delete their own comments; admins can delete any. Deleting a comment deletes its replies. Admin public comments email the request author and earlier commenters (category "Replies from the team"). Internal comments are visible to the team only and never trigger email or the public webhook payload.
 
 ### 5.5 Embeddable widget
 `<script src="https://feedback.yoursite.com/widget.js" async></script>` adds a floating "Feedback" button (or binds to any element with `data-lort-feedback`). It opens an iframe modal containing the Suggest something form, with sign-in inside the iframe using `Partitioned` (CHIPS) cookies. After submitting, the widget links to the request on the board. The widget never shows the "Get your own board" card. No SSO.
@@ -229,18 +236,18 @@ Always on: per-IP and per-user rate limits (sign-up, request creation, comments,
 
 ## 6. Dashboard (`/dashboard`)
 
-Sign-in is for superusers only. The sidebar has Requests (with an "N new" badge), Roadmap, Changelog, then View the board (opens `/feedback` in a new tab), Docs and Settings at the bottom, then the signed-in admin with the Lort version. A dashboard session also signs the admin in on the board as their linked team profile (renewed on each visit, so their comments carry the Team badge); it ends only when the server refuses the session, never because a request was cut short. It collapses to a 76px icon rail (remembered per browser). Below 768px the sidebar becomes a top bar with a menu sheet.
+Sign-in is for superusers only. The sidebar has Requests (with an "N new" badge), Roadmap, Changelog, then Docs and Settings at the bottom, then the signed-in admin with the Lort version (its menu has View the board and Sign out). A dashboard session also signs the admin in on the board as their linked team profile (section 3), so their comments carry the Team badge. It collapses to a 76px icon rail (remembered per browser); in the rail the labels are hidden visually but kept for screen readers. The sidebar only shows pages that exist in the running build (Roadmap and Changelog join in Phase 2, Docs in Phase 6). Below 768px the sidebar becomes a top bar with a menu sheet.
 
 ### 6.1 Requests (`/dashboard/requests`)
-- Header: title, "142 total · 38 waiting for you" (waiting = Pending + Reviewing), a Live indicator, refresh button, and "New request" (opens Suggest something as the admin's board profile; creating one on behalf of an email arrives with email in phase 3). The counts come from `GET /api/lort/stats`, which leaves merged requests out.
-- Filters (all in the URL): search, Status (defaults to the four open statuses, summarised "Open"), Board, Tags, Visibility (On the board / Hidden), and sort (Newest, Oldest, Most upvoted, Recently updated).
+- Header: title, "142 total · 38 waiting for you" (waiting = Pending + Reviewing), a Live indicator, refresh button, and "New request" (opens Suggest something as the admin's board profile, optionally on behalf of an email, in one save: see section 3). The counts come from `GET /api/lort/stats`, which leaves merged requests out.
+- Filters (all in the URL; the search field follows it, and Clear filters also drops a search that hasn't reached the URL yet): search, Status (defaults to the four open statuses, summarised "Open"), Board, Tags, Visibility (On the board / Hidden), and sort (Newest, Oldest, Most upvoted, Recently updated).
 - Table columns: status (icon only, with tooltip and `aria-label`), request title with "New" and "Hidden" markers, votes, tags, date, requested by. Rows the team has not opened yet have the `primary-soft` tint and count toward the sidebar badge; opening a request sets `teamSeenAt`.
 - Infinite scroll; realtime inserts; the rate-limited refresh button.
 
 ### 6.2 Request (`/dashboard/requests/<id>`)
 The same layout as the public request page, plus:
-- Breadcrumb "Requests / <Board>" and "3 of 12 in Reviewing" for the current queue.
-- Editable chips: status (opens a menu), board (moved through `POST /api/lort/requests/{id}/board`, which adds a "board changed" timeline entry), tags, "add tag", and the "On the board" visibility switch.
+- Breadcrumb "Requests / <Board>" and "3 of 12 in Reviewing" for the current queue. The queue is the requests table's filters, carried in the request page's URL; Skip opens the next request in it.
+- Editable chips: status (opens a menu with the triage bar's moves, minus Merge and Skip, so the server's transition rules are the only rules), board (moved through `POST /api/lort/requests/{id}/board`, which adds a `board_changed` timeline entry), tags, "add tag", and the "On the board" visibility switch.
 - Composer with the Public/Internal toggle, images and mic.
 - Timeline with status changes, internal notes (note style, "Only the team sees this") and threaded comments.
 - Avatar popovers with email, join date, request and vote counts, verification state, **Copy password reset link** (works without email) and **Ban**/Unban.
@@ -275,11 +282,12 @@ Three collapsible columns (Planned, In progress, Completed) with drag-and-drop b
 The `docs/` markdown rendered with a sidebar: getting started, setup script, updating and rollback, reverse proxies, email, voice, widget, MCP, webhooks (with payload reference and signature verification), backups, troubleshooting.
 
 ### 6.6 Settings (`/dashboard/settings`)
-One page with an in-page table of contents grouped as **Your board** (Branding, Boards, Tags, Roadmap, Team), **Services** (Email, Voice dictation, Spam protection), **Connect** (Widget, MCP server, Webhooks), **Server** (Backups, Updates). Each section saves on change with a toast.
+One page with an in-page table of contents grouped as **Your board** (Branding, Boards, Tags, Roadmap, Team), **Services** (Email, Voice dictation, Spam protection), **Connect** (Widget, MCP server, Webhooks), **Server** (Backups, Updates). Each section saves on change with a toast. The table of contents highlights the section you're on; a section you jump to stays highlighted until you scroll yourself, and the last one is highlighted at the bottom of the page.
 - **Branding:**
   - App logo (square PNG, SVG or WebP, at least 128px). The fallback is the first letter on primary with a −4° tilt.
+  - The logo is also the favicon: PocketBase's 64x64 thumb of it (an SVG logo as it is). Without a logo, the favicon is the letter mark, drawn as an SVG.
   - App name, used in the top bar, emails and the browser tab.
-  - Primary colour: the 8 presets in section 14.2 plus a custom hex.
+  - Primary colour: the 8 presets in section 14.2 plus a custom hex, with a preview swatch the size of the presets.
   - Switch: "Show 'Get your own board' card".
 - **Boards:** drag to reorder; per board Public and Needs approval switches; the top board is the default; add, rename, delete (only when empty, or move its requests to another board first).
 - **Tags:** add, rename, reorder, delete (removes it from requests).
@@ -388,7 +396,7 @@ whisper.cpp with the q5 quantised large-v3-turbo model. The model downloads to `
 ## 10. Branding rules
 
 - "Powered by Lort" is always in the public footer.
-- The floating "Get your own board like this" card on public pages can be switched off. It is always hidden in the widget and links to `/lort-landing`.
+- The floating "Get your own board like this" card on public pages can be switched off. It is always hidden in the widget and links to `/lort-landing` (to the GitHub repository until `/lort-landing` ships in Phase 6).
 - The owner's name, logo and primary colour lead on public pages. Lort's identity leads on `/lort-landing`, the dashboard sign-in footer and the docs.
 
 ## 11. Errors
@@ -441,7 +449,7 @@ The full token tables and component rules are in `DESIGN.md`. This part fixes th
 ### 14.2 Colour
 - Dark theme first: warm charcoal ground `#1a1716`, card surface `#24201e`, raised surface `#2c2725`, button surface `#352f2c`, sunken `#151211` (sidebar). Light theme: ground `#f3f1ef`, white cards, raised `#efeae6`. Theme follows the visitor's system setting.
 - Ink `#f5efea` / `#1e1a18`, ink-2 for body, muted `#b3a79e` / `#655b55` for meta.
-- **Primary** is the owner's colour (demo and Lort default: Pink `#cc3a6d`). Presets in Settings: Pink `#cc3a6d`, Coral `#d4553a`, Amber `#b7791f`, Leaf `#2f855a`, Teal `#0f8a8a`, Ocean `#2563eb`, Grape `#7c4dcc`, Graphite `#4b5563`, plus a custom hex. For any primary, Lort derives `on-primary` (white or ink, whichever reaches 4.5:1; if neither does, the primary's OKLCH lightness is nudged until one does), `primary-text` per theme (lightness-adjusted to 4.5:1 on ground and surface) and `primary-soft` (a low-alpha tint), and injects them as CSS variables in the root layout.
+- **Primary** is the owner's colour (demo and Lort default: Pink `#cc3a6d`). Presets in Settings: Pink `#cc3a6d`, Coral `#d4553a`, Amber `#b7791f`, Leaf `#2f855a`, Teal `#0f8a8a`, Ocean `#2563eb`, Grape `#7c4dcc`, Graphite `#4b5563`, plus a custom hex. For any primary, Lort derives `on-primary` (white or ink, whichever reaches 4.5:1; if neither does, the primary's OKLCH lightness is nudged until one does), `primary-text` per theme (lightness-adjusted to 4.5:1 on ground and surface) and `primary-soft` (a low-alpha tint). The root layout injects `--primary`, `--primary-foreground` and `--primary-text` as CSS variables; `primary-soft` is mixed from `--primary` in CSS (`color-mix`).
 - **The Owner's Colour Rule:** primary means "live" (voted, selected, primary action) and never decorates. Exception: `/lort-landing` (14.6).
 - **Status colours** are for statuses only: Pending yellow, Reviewing orange, Planned sky, In progress violet, Completed green, Closed red; icon values ≥3:1 and `status-*-text` values ≥4.5:1 on every ground in both themes (values in `DESIGN.md`).
 - Internal notes use their own note palette (`note-bg`, `note-border`, `note-ink`), nowhere else.
@@ -474,7 +482,8 @@ Build each component in `web/` with shadcn/ui and Tailwind, following the fronte
 | TriageBar | Status-driven actions (4.2); forward action is the one primary, last; inset-sm + float. |
 | InternalNote | note-bg, 2px dashed note-border, lock + "Only the team sees this". |
 | Avatar | Picture or initial on a warm fill picked from the name; keyline on public pages; primary ring for the team. |
-| Toast | Past tense, at most one action; Undo toasts draw a 60-second countdown bar in primary. |
+| Toast | Past tense, at most one action; Undo toasts draw a 60-second countdown bar in primary. 420px wide, message and actions on one row. |
+| Dialog | 22px radius; the buttons sit in the dialog's own padding, with no separate footer band. |
 
 ### 14.5 Skeletons
 Every page that loads content has its own skeleton matching its real layout. The shell (top bar, sidebar, nav, floating/triage bars when status-independent, headings) renders for real; only the content becomes bones. Bones are `surface-2` pills (`border-radius: 999px`; 12–14px for title bones) pulsing opacity 1 → 0.55 over 1.6 s, static under reduced motion. The container has `aria-busy="true"`. Designed: `/feedback`, `/dashboard/requests`, `/dashboard/roadmap`, `/dashboard/requests/<id>` (the triage bar is a bone because its actions depend on the status). The other pages follow the same pattern: `/feedback/<id>`, `/roadmap`, `/changelog`, `/changelog/<slug>`, dashboard changelog list and editor, settings.
@@ -492,7 +501,7 @@ All pages exist on the canvas in dark; `/feedback` and `/dashboard/requests` als
 
 ### 15.1 Public
 - **Top bar** (76px, max 1120px): logo mark + app name, Feedback / Roadmap / Changelog nav pills (current one on surface-2), search field, avatar or Sign in.
-- **`/feedback`:** column max 860px, 32px gutters (24px on phones), 12px between cards, 140px bottom padding; display-xl headline "Got an idea for <App>?" with body-lg intro "Stick a dot on the ones you want most. The team builds what gets the most dots, and tells you when it ships."; FloatingBar fixed at bottom centre; footer "Powered by Lort"; the optional "Get your own board like this" card floats bottom-right with `shadow-inset-sm` + card float.
+- **`/feedback`:** column max 860px, 32px gutters (24px on phones), 12px between cards, 140px bottom padding; display-xl headline "Got an idea for <App>?" with body-lg intro "Stick a dot on the ones you want most. The team builds what gets the most dots, and tells you when it ships."; FloatingBar fixed at bottom centre; footer "Powered by Lort"; the optional "Get your own board like this" card floats bottom-left (the canvas's placement), from the `xl` breakpoint up so it never meets the floating bar, with `shadow-inset-sm` + card float.
 - **`/feedback` on phones:** stacked cards with compact stickers, compact FloatingBar.
 - **`/feedback/<id>`:** "All ideas" back link; display-l title with author row and the sticker on the right ("Stick a dot"); body; "N comments" section with timeline entries and one-level reply bubbles on surface; Composer for signed-in users.
 - **Suggest modal:** centred 22px-radius dialog over a blurred, dimmed board (overlay above the stickers); title "Suggest something" with "Got an idea for <App>?"; Board pills, Title with similar suggestions, Tags, Details composer.

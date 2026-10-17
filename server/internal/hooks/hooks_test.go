@@ -366,3 +366,140 @@ func TestVoteDeleteAndRecountAreAtomic(t *testing.T) {
 		t.Errorf("upvoteCount = %d after a standalone vote delete, want 0", r.GetInt("upvoteCount"))
 	}
 }
+
+func TestTeamShowingARequestApprovesIt(t *testing.T) {
+	f := newFixture(t)
+	r := testutil.Request(t, f.app, f.approval, f.mara, "Crash on paste", "pending", 0)
+	r.Set("visible", false)
+	r.Set("awaitingApproval", true)
+	if err := f.app.Save(r); err != nil {
+		t.Fatal(err)
+	}
+	su := testutil.Superuser(t, f.app, "root@example.com")
+	f.scenario(t, tests.ApiScenario{Method: http.MethodPatch, URL: "/api/collections/requests/records/" + r.Id,
+		Headers: map[string]string{"Authorization": testutil.Token(t, su)}, Body: strings.NewReader(`{"visible":true}`),
+		ExpectedStatus: 200, ExpectedContent: []string{`"visible":true`, `"awaitingApproval":false`}}, nil)
+}
+
+// The JS SDK sends the non-file fields of a multipart create as JSON in "@jsonPayload", so an
+// admin's internal flag arrives as a real boolean even with an image attached.
+func TestAdminInternalRequestWithImage(t *testing.T) {
+	f := newFixture(t)
+	body := &bytes.Buffer{}
+	mp := multipart.NewWriter(body)
+	_ = mp.WriteField("@jsonPayload", `{"board":"`+f.features.Id+`","title":"Roadmap notes","internal":true}`)
+	w, err := mp.CreateFormFile("images", "notes.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = w.Write(png)
+	if err := mp.Close(); err != nil {
+		t.Fatal(err)
+	}
+	f.scenario(t, tests.ApiScenario{Method: http.MethodPost, URL: "/api/collections/requests/records", Body: body,
+		Headers:        map[string]string{"Authorization": testutil.Token(t, f.admin), "Content-Type": mp.FormDataContentType()},
+		ExpectedStatus: 200, ExpectedContent: []string{`"visible":false`, `"awaitingApproval":false`, `"images":["`}}, nil)
+}
+
+// Deleting a comment takes its replies with it, whoever wrote them: the delete dialog says so,
+// and an orphaned reply would still count towards the request's comments without being shown.
+func TestDeletingACommentDeletesItsReplies(t *testing.T) {
+	f := newFixture(t)
+	r := testutil.Request(t, f.app, f.features, f.mara, "Dark mode", "pending", 0)
+	c, err := f.app.FindCollectionByNameOrId("comments")
+	if err != nil {
+		t.Fatal(err)
+	}
+	save := func(author *core.Record, body, parent string) *core.Record {
+		rec := core.NewRecord(c)
+		rec.Set("request", r.Id)
+		rec.Set("author", author.Id)
+		rec.Set("body", body)
+		rec.Set("parent", parent)
+		if err := f.app.Save(rec); err != nil {
+			t.Fatal(err)
+		}
+		return rec
+	}
+	top := save(f.mara, "Same on iOS", "")
+	save(f.admin, "Thanks, looking into it", top.Id)
+	other := save(f.admin, "Another thread", "")
+
+	f.scenario(t, tests.ApiScenario{Method: http.MethodDelete, URL: "/api/collections/comments/records/" + top.Id,
+		Headers: map[string]string{"Authorization": testutil.Token(t, f.mara)}, ExpectedStatus: 204},
+		func(t *testing.T, app *tests.TestApp) {
+			left, err := app.FindAllRecords("comments", dbx.HashExp{"request": r.Id})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(left) != 1 || left[0].Id != other.Id {
+				t.Errorf("comments left = %d, want only the other thread", len(left))
+			}
+		})
+}
+
+// Deleting a request cascades into its comments; replies the hook already removed mustn't trip it.
+func TestDeletingARequestWithAThread(t *testing.T) {
+	f := newFixture(t)
+	r := testutil.Request(t, f.app, f.features, f.mara, "Dark mode", "pending", 0)
+	c, err := f.app.FindCollectionByNameOrId("comments")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := ""
+	for _, body := range []string{"Same on iOS", "Thanks"} {
+		rec := core.NewRecord(c)
+		rec.Set("request", r.Id)
+		rec.Set("author", f.mara.Id)
+		rec.Set("body", body)
+		rec.Set("parent", parent)
+		if err := f.app.Save(rec); err != nil {
+			t.Fatal(err)
+		}
+		parent = rec.Id
+	}
+	su := testutil.Superuser(t, f.app, "root@example.com")
+	f.scenario(t, tests.ApiScenario{Method: http.MethodDelete, URL: "/api/collections/requests/records/" + r.Id,
+		Headers: map[string]string{"Authorization": testutil.Token(t, su)}, ExpectedStatus: 204},
+		func(t *testing.T, app *tests.TestApp) {
+			if n, _ := app.CountRecords("comments"); n != 0 {
+				t.Errorf("comments left = %d", n)
+			}
+		})
+}
+
+// The team posts for someone in one request: the person (found or created by email) is the
+// author and has the automatic vote, or nothing is created at all.
+func TestTeamPostsOnBehalfOfSomeone(t *testing.T) {
+	f := newFixture(t)
+	post := func(auth *core.Record, onBehalf string, status int, want ...string) {
+		t.Helper()
+		f.scenario(t, tests.ApiScenario{Method: http.MethodPost, URL: "/api/collections/requests/records",
+			Headers:        map[string]string{"Authorization": testutil.Token(t, auth), "Content-Type": "application/json"},
+			Body:           strings.NewReader(`{"board":"` + f.features.Id + `","title":"Calendar view","onBehalf":"` + onBehalf + `"}`),
+			ExpectedStatus: status, ExpectedContent: want}, nil)
+	}
+
+	post(f.admin, "priya@example.com", 200, `"upvoteCount":1`)
+	priya, err := f.app.FindAuthRecordByEmail("users", "priya@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := f.app.FindFirstRecordByFilter("requests", "author = {:a}", dbx.Params{"a": priya.Id})
+	if err != nil {
+		t.Fatalf("no request by priya: %v", err)
+	}
+	if v, _ := f.app.FindFirstRecordByFilter("votes", "request = {:r} && user = {:u}", dbx.Params{"r": r.Id, "u": priya.Id}); v == nil {
+		t.Error("priya's automatic vote is missing")
+	}
+	if v, _ := f.app.FindFirstRecordByFilter("votes", "request = {:r} && user = {:u}", dbx.Params{"r": r.Id, "u": f.admin.Id}); v != nil {
+		t.Error("the team member shouldn't have voted")
+	}
+
+	before, _ := f.app.CountRecords("requests")
+	post(f.admin, "not an email", 400, "email of the person")
+	post(f.mara, "priya@example.com", 403, "Only the team")
+	if after, _ := f.app.CountRecords("requests"); after != before {
+		t.Errorf("requests = %d, want %d: a failed post must leave nothing behind", after, before)
+	}
+}

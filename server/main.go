@@ -17,6 +17,7 @@ import (
 	"github.com/hacker4ofakind/lort/server/internal/hooks"
 	"github.com/hacker4ofakind/lort/server/internal/requests"
 	"github.com/hacker4ofakind/lort/server/internal/schema"
+	"github.com/hacker4ofakind/lort/server/internal/site"
 	"github.com/hacker4ofakind/lort/server/internal/team"
 	"github.com/hacker4ofakind/lort/server/internal/web"
 )
@@ -30,6 +31,7 @@ func main() {
 	app := pocketbase.NewWithConfig(pocketbase.Config{DefaultDataDir: cfg.DataDir})
 	svc := requests.New(app)
 	hooks.Register(app, svc)
+	siteCfg := site.NewCache(app)
 
 	webURL, err := url.Parse(cfg.WebURL)
 	if err != nil {
@@ -57,8 +59,8 @@ func main() {
 				return e.Next()
 			})
 		}
-		api.Register(se, api.Deps{Svc: svc, Cfg: cfg})
-		se.Router.Any("/{path...}", web.Proxy(webURL))
+		api.Register(se, api.Deps{Svc: svc, Cfg: cfg, Site: siteCfg})
+		se.Router.Any("/{path...}", web.Proxy(webURL, siteCfg.Header))
 
 		if len(cfg.WebCmd) > 0 {
 			ctx, cancel := context.WithCancel(context.Background())

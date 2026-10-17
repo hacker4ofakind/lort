@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/hacker4ofakind/lort/server/internal/schema"
 	"github.com/hacker4ofakind/lort/server/internal/testutil"
@@ -54,5 +55,25 @@ func TestSearchIndexFollowsRequests(t *testing.T) {
 	}
 	if count("night") != 0 {
 		t.Fatal("deleted request still indexed")
+	}
+}
+
+// The favicon links to the logo's 64x64 thumb, so boards created before it existed get it too.
+func TestLogoHasAFaviconThumb(t *testing.T) {
+	app := testutil.NewApp(t)
+	c, err := app.FindCollectionByNameOrId("settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Fields.GetByName("logo").(*core.FileField).Thumbs = nil
+	if err := app.Save(c); err != nil {
+		t.Fatal(err)
+	}
+	if err := schema.Ensure(app); err != nil {
+		t.Fatal(err)
+	}
+	c, _ = app.FindCollectionByNameOrId("settings")
+	if got := c.Fields.GetByName("logo").(*core.FileField).Thumbs; len(got) != 1 || got[0] != "64x64" {
+		t.Errorf("logo thumbs = %v, want [64x64]", got)
 	}
 }

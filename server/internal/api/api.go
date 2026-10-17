@@ -10,15 +10,18 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 
+	"github.com/hacker4ofakind/lort/server/internal/catalog"
 	"github.com/hacker4ofakind/lort/server/internal/config"
 	"github.com/hacker4ofakind/lort/server/internal/requests"
+	"github.com/hacker4ofakind/lort/server/internal/site"
 	"github.com/hacker4ofakind/lort/server/internal/status"
 	"github.com/hacker4ofakind/lort/server/internal/team"
 )
 
 type Deps struct {
-	Svc *requests.Service
-	Cfg config.Config
+	Svc  *requests.Service
+	Cfg  config.Config
+	Site *site.Cache
 }
 
 // Register adds every /api/lort route.
@@ -29,6 +32,7 @@ func Register(se *core.ServeEvent, d Deps) {
 	})
 	g.GET("/config", d.config)
 	g.GET("/requests", d.list)
+	g.GET("/requests/{id}", d.detail)
 	g.GET("/similar", d.similar)
 	g.POST("/requests/{id}/vote", d.vote).Bind(apis.RequireAuth("users"))
 
@@ -37,6 +41,12 @@ func Register(se *core.ServeEvent, d Deps) {
 	team.POST("/requests/{id}/undo", d.undo)
 	team.POST("/requests/{id}/merge", d.merge)
 	team.POST("/requests/{id}/seen", d.seen)
+	team.POST("/requests/{id}/board", d.moveBoard)
+	team.POST("/requests/{id}/author", d.reassign)
+	team.GET("/queue", d.queue)
+	team.GET("/stats", d.stats)
+	team.POST("/order/{collection}", d.order)
+	team.DELETE("/boards/{id}", d.deleteBoard)
 	team.GET("/team", d.teamList)
 	team.GET("/team/me", d.teamMe)
 	team.POST("/team/invite", d.teamInvite)
@@ -65,43 +75,11 @@ func actor(e *core.RequestEvent) (*core.Record, error) {
 }
 
 func (d Deps) config(e *core.RequestEvent) error {
-	settings, err := e.App.FindFirstRecordByFilter("settings", "")
+	c, err := d.Site.Get()
 	if err != nil {
 		return err
 	}
-	logo := ""
-	if f := settings.GetString("logo"); f != "" {
-		logo = "/api/files/settings/" + settings.Id + "/" + f
-	}
-	boards, err := e.App.FindRecordsByFilter("boards", "isPublic = true", "order", 0, 0)
-	if err != nil {
-		return err
-	}
-	tags, err := e.App.FindRecordsByFilter("tags", "", "order", 0, 0)
-	if err != nil {
-		return err
-	}
-	type ref struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-	}
-	toRefs := func(rs []*core.Record) []ref {
-		out := make([]ref, len(rs))
-		for i, r := range rs {
-			out[i] = ref{r.Id, r.GetString("name")}
-		}
-		return out
-	}
-	return e.JSON(http.StatusOK, map[string]any{
-		"appName":         settings.GetString("appName"),
-		"logo":            logo,
-		"primaryColor":    settings.GetString("primaryColor"),
-		"showLandingCard": settings.GetBool("showLandingCard"),
-		"roadmapPublic":   settings.GetBool("roadmapPublic"),
-		"boards":          toRefs(boards),
-		"tags":            toRefs(tags),
-		"features":        map[string]bool{"email": false, "voice": false, "turnstile": false},
-	})
+	return e.JSON(http.StatusOK, c)
 }
 
 func csv(v string) []string {
@@ -111,19 +89,24 @@ func csv(v string) []string {
 	return strings.Split(v, ",")
 }
 
-func (d Deps) list(e *core.RequestEvent) error {
+// query reads the list filters shared by /requests and /queue.
+func query(e *core.RequestEvent) requests.Query {
 	q := e.Request.URL.Query()
 	page, _ := strconv.Atoi(q.Get("page"))
 	perPage, _ := strconv.Atoi(q.Get("perPage"))
+	return requests.Query{
+		Sort: q.Get("sort"), Statuses: csv(q.Get("status")), Boards: csv(q.Get("board")),
+		Tags: csv(q.Get("tag")), Visibility: q.Get("visibility"), Search: q.Get("q"),
+		Page: page, PerPage: perPage,
+	}
+}
+
+func (d Deps) list(e *core.RequestEvent) error {
 	var viewer *core.Record
 	if e.Auth != nil && e.Auth.Collection().Name == "users" {
 		viewer = e.Auth
 	}
-	res, err := d.Svc.List(requests.Query{
-		Sort: q.Get("sort"), Statuses: csv(q.Get("status")), Boards: csv(q.Get("board")),
-		Tags: csv(q.Get("tag")), Visibility: q.Get("visibility"), Search: q.Get("q"),
-		Page: page, PerPage: perPage,
-	}, viewer, e.HasSuperuserAuth())
+	res, err := d.Svc.List(query(e), viewer, e.HasSuperuserAuth())
 	if err != nil {
 		return err
 	}
@@ -269,4 +252,105 @@ func (d Deps) userResetLink(e *core.RequestEvent) error {
 		return fail(e, err)
 	}
 	return e.JSON(http.StatusOK, map[string]any{"link": link})
+}
+
+// viewer is who is looking at a request page: a board user, or a superuser's team profile
+// (team = true, the dashboard's view).
+func viewer(e *core.RequestEvent) (*core.Record, bool, error) {
+	switch {
+	case e.Auth == nil:
+		return nil, false, nil
+	case e.HasSuperuserAuth():
+		p, err := actor(e)
+		return p, true, err
+	case e.Auth.Collection().Name == "users":
+		return e.Auth, false, nil
+	}
+	return nil, false, nil
+}
+
+func (d Deps) detail(e *core.RequestEvent) error {
+	who, team, err := viewer(e)
+	if err != nil {
+		return err
+	}
+	det, err := d.Svc.Detail(e.Request.PathValue("id"), who, team)
+	if err != nil {
+		return fail(e, err)
+	}
+	return e.JSON(http.StatusOK, det)
+}
+
+func (d Deps) moveBoard(e *core.RequestEvent) error {
+	var body struct {
+		Board string `json:"board"`
+	}
+	if err := e.BindBody(&body); err != nil || body.Board == "" {
+		return e.BadRequestError("Pick a board.", err)
+	}
+	who, err := actor(e)
+	if err != nil {
+		return err
+	}
+	if err := d.Svc.MoveBoard(e.Request.PathValue("id"), body.Board, who); err != nil {
+		return fail(e, err)
+	}
+	return e.NoContent(http.StatusNoContent)
+}
+
+func (d Deps) reassign(e *core.RequestEvent) error {
+	var body struct {
+		Email string `json:"email"`
+	}
+	if err := e.BindBody(&body); err != nil {
+		return e.BadRequestError("Enter an email address.", err)
+	}
+	u, err := team.UserByEmail(e.App, body.Email)
+	if err != nil {
+		return fail(e, err)
+	}
+	if err := d.Svc.Reassign(e.Request.PathValue("id"), u); err != nil {
+		return fail(e, err)
+	}
+	return e.NoContent(http.StatusNoContent)
+}
+
+func (d Deps) queue(e *core.RequestEvent) error {
+	info, err := d.Svc.Queue(query(e), e.Request.URL.Query().Get("current"))
+	if err != nil {
+		return err
+	}
+	return e.JSON(http.StatusOK, info)
+}
+
+func (d Deps) stats(e *core.RequestEvent) error {
+	st, err := d.Svc.Stats()
+	if err != nil {
+		return err
+	}
+	return e.JSON(http.StatusOK, st)
+}
+
+func (d Deps) order(e *core.RequestEvent) error {
+	var body struct {
+		IDs []string `json:"ids"`
+	}
+	if err := e.BindBody(&body); err != nil {
+		return e.BadRequestError("Send the ids in their new order.", err)
+	}
+	if err := catalog.SetOrder(e.App, e.Request.PathValue("collection"), body.IDs); err != nil {
+		return fail(e, err)
+	}
+	return e.NoContent(http.StatusNoContent)
+}
+
+func (d Deps) deleteBoard(e *core.RequestEvent) error {
+	who, err := actor(e)
+	if err != nil {
+		return err
+	}
+	if err := d.Svc.DeleteBoard(e.Request.PathValue("id"), e.Request.URL.Query().Get("moveTo"), who); err != nil {
+		return fail(e, err)
+	}
+	return e.NoContent(http.StatusNoContent)
 }

@@ -2,6 +2,7 @@
 package testutil
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -33,7 +34,7 @@ func Board(t testing.TB, app core.App, name string, public, approval bool) *core
 	return save(t, app, "boards", map[string]any{"name": name, "isPublic": public, "requireApproval": approval})
 }
 
-// User creates a verified user.
+// User creates a verified user named like the sign-up hook would: the part before the @.
 func User(t testing.TB, app core.App, email string) *core.Record {
 	t.Helper()
 	c, err := app.FindCollectionByNameOrId("users")
@@ -44,6 +45,7 @@ func User(t testing.TB, app core.App, email string) *core.Record {
 	r.SetEmail(email)
 	r.SetPassword("correcthorse")
 	r.SetVerified(true)
+	r.Set("name", strings.Split(email, "@")[0])
 	if err := app.Save(r); err != nil {
 		t.Fatal(err)
 	}

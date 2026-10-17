@@ -2,6 +2,9 @@
 package hooks
 
 import (
+	"errors"
+	"strings"
+
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 
@@ -15,13 +18,32 @@ func Register(app core.App, svc *requests.Service) {
 	app.OnRecordCreateRequest("requests").BindFunc(func(e *core.RecordRequestEvent) error {
 		return onRequestCreate(e, svc)
 	})
-	app.OnRecordUpdateRequest("requests").BindFunc(rejectBanned)
+	app.OnRecordUpdateRequest("requests").BindFunc(onRequestUpdate)
 	app.OnRecordCreateRequest("comments").BindFunc(onCommentCreate)
 	app.OnRecordDeleteRequest("boards").BindFunc(onBoardDelete)
 	// Keep upvoteCount true when votes go away without ToggleVote, e.g. when a deleted
 	// account cascades into its votes. PocketBase's own delete handler runs after this one
 	// and commits its transaction before returning, so the delete and the recount share a
 	// transaction opened here (inside a cascade it is the outer one, reused).
+	// A comment's replies go with it, in the same transaction (opened here for the same reason
+	// as the votes below). parent is a text field, so PocketBase has no cascade to do it.
+	app.OnRecordDeleteExecute("comments").BindFunc(func(e *core.RecordEvent) error {
+		original := e.App
+		defer func() { e.App = original }()
+		return e.App.RunInTransaction(func(tx core.App) error {
+			e.App = tx
+			replies, err := tx.FindAllRecords("comments", dbx.HashExp{"parent": e.Record.Id})
+			if err != nil {
+				return err
+			}
+			for _, r := range replies {
+				if err := tx.Delete(r); err != nil {
+					return err
+				}
+			}
+			return e.Next()
+		})
+	})
 	app.OnRecordDeleteExecute("votes").BindFunc(func(e *core.RecordEvent) error {
 		original := e.App
 		defer func() { e.App = original }()
@@ -68,6 +90,15 @@ func rejectBanned(e *core.RecordRequestEvent) error {
 	return e.Next()
 }
 
+// onRequestUpdate rejects banned authors, and when the team puts a request on the board it is
+// no longer waiting for approval.
+func onRequestUpdate(e *core.RecordRequestEvent) error {
+	if e.HasSuperuserAuth() && e.Record.GetBool("visible") {
+		e.Record.Set("awaitingApproval", false)
+	}
+	return rejectBanned(e)
+}
+
 func onRequestCreate(e *core.RecordRequestEvent, svc *requests.Service) error {
 	if err := honeypot(e); err != nil {
 		return err
@@ -85,6 +116,12 @@ func onRequestCreate(e *core.RecordRequestEvent, svc *requests.Service) error {
 		return err
 	}
 	internal, _ := info.Body["internal"].(bool)
+	// The team can post for someone who asked: onBehalf is their email.
+	onBehalf, _ := info.Body["onBehalf"].(string)
+	onBehalf = strings.TrimSpace(onBehalf)
+	if onBehalf != "" && !author.GetBool("isAdmin") {
+		return e.ForbiddenError("Only the team can post for someone else.", nil)
+	}
 
 	r := e.Record
 	r.Set("author", author.Id)
@@ -103,11 +140,23 @@ func onRequestCreate(e *core.RecordRequestEvent, svc *requests.Service) error {
 		r.Set("visible", true)
 		r.Set("awaitingApproval", false)
 	}
-	// Save the request, its author's vote and its timeline entry in one transaction.
-	// PocketBase holds the response until the transaction commits, so the reply carries
-	// the real vote count and a failure leaves nothing behind.
+	// Save the request, its author's vote and its timeline entry in one transaction (with the
+	// person posted for, found or created by email). PocketBase holds the response until the
+	// transaction commits, so the reply carries the real vote count and a failure leaves
+	// nothing behind.
 	return e.App.RunInTransaction(func(tx core.App) error {
 		e.App = tx
+		if onBehalf != "" {
+			u, err := team.UserByEmail(tx, onBehalf)
+			if errors.Is(err, team.ErrBadEmail) {
+				return e.BadRequestError("Enter the email of the person you're posting for, like name@example.com.", nil)
+			}
+			if err != nil {
+				return err
+			}
+			author = u
+			r.Set("author", u.Id)
+		}
 		if err := e.Next(); err != nil {
 			return err
 		}

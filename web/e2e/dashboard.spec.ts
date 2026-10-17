@@ -1,0 +1,158 @@
+import { expect, test, type Page } from "@playwright/test"
+import { seedRequest, signInAdmin, unique } from "./helpers"
+
+async function openRequest(page: Page, title: string) {
+  await page.goto("/dashboard/requests?status=all")
+  await page.getByRole("link", { name: title }).click()
+  await page.waitForURL(/\/dashboard\/requests\/[a-z0-9]+/)
+  await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible()
+}
+
+const triage = (page: Page) => page.getByRole("toolbar", { name: "Triage" })
+
+test("the team moves a request through every status, with undo", async ({ page, request }) => {
+  const title = `Calendar heatmap ${unique()}`
+  await seedRequest(request, title)
+  await signInAdmin(page)
+  await expect(page.getByRole("link", { name: title })).toBeVisible()
+  await openRequest(page, title)
+
+  await triage(page).getByRole("button", { name: "Accept" }).click()
+  await expect(page.getByRole("button", { name: "Status: Reviewing" })).toBeVisible()
+
+  await triage(page).getByRole("button", { name: "Add to roadmap" }).click()
+  await expect(page.getByText("Added to the roadmap")).toBeVisible()
+
+  await triage(page).getByRole("button", { name: "Re-review" }).click()
+  await expect(page.getByText("Taken off the roadmap")).toBeVisible()
+  await triage(page).getByRole("button", { name: "Add to roadmap" }).click()
+  await triage(page).getByRole("button", { name: "Start working" }).click()
+  await expect(page.getByRole("button", { name: "Status: In progress" })).toBeVisible()
+
+  await triage(page).getByRole("button", { name: "Complete" }).click()
+  await expect(page.getByText("Marked as completed")).toBeVisible()
+  // The message, Undo and the close button share one line.
+  const [message, undo, dismiss] = await Promise.all(
+    [page.getByText("Marked as completed"), page.getByRole("button", { name: "Undo" }), page.getByRole("button", { name: "Dismiss" })].map(
+      (l) => l.boundingBox()
+    )
+  )
+  expect(Math.abs(message!.y + message!.height / 2 - (undo!.y + undo!.height / 2))).toBeLessThan(4)
+  expect(Math.abs(undo!.y + undo!.height / 2 - (dismiss!.y + dismiss!.height / 2))).toBeLessThan(4)
+  await page.getByRole("button", { name: "Undo" }).click()
+  await expect(page.getByText("Moved back to In progress")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Status: In progress" })).toBeVisible()
+
+  await triage(page).getByRole("button", { name: "Complete" }).click()
+  await expect(page.getByRole("button", { name: "Status: Completed" })).toBeVisible()
+  await triage(page).getByRole("button", { name: "Reopen" }).click()
+  await expect(page.getByRole("button", { name: "Status: In progress" })).toBeVisible()
+})
+
+test("closing and reopening, and the status chip menu", async ({ page, request }) => {
+  const title = `Share as image ${unique()}`
+  await seedRequest(request, title)
+  await signInAdmin(page)
+  await openRequest(page, title)
+  await triage(page).getByRole("button", { name: "Close" }).click()
+  await expect(page.getByRole("button", { name: "Status: Closed" })).toBeVisible()
+  await page.getByRole("button", { name: "Status: Closed" }).click()
+  await page.getByRole("menuitem", { name: "Reopen" }).click()
+  await expect(page.getByRole("button", { name: "Status: Pending" })).toBeVisible()
+})
+
+test("merging a duplicate moves it and leaves a pointer", async ({ page, request }) => {
+  const id = unique()
+  const target = `Dark theme ${id}`
+  const source = `Night mode ${id}`
+  await seedRequest(request, target)
+  const src = await seedRequest(request, source)
+  await signInAdmin(page)
+  await openRequest(page, source)
+  await triage(page).getByRole("button", { name: "Merge" }).click()
+  await page.getByPlaceholder("Search by title").fill(`Dark theme ${id}`)
+  await page.getByRole("option", { name: new RegExp(`Dark theme ${id}`) }).click()
+  await page.getByRole("dialog").getByRole("button", { name: "Merge", exact: true }).click()
+  await page.waitForURL(/\/dashboard\/requests\/[a-z0-9]+/)
+  await expect(page.getByRole("heading", { level: 1, name: target })).toBeVisible()
+
+  await page.goto(`/feedback/${src.id}`)
+  await expect(page.getByText(`Merged into ${target}`)).toBeVisible()
+})
+
+test("internal notes stay inside the team, and Skip opens the next request", async ({ page, request }) => {
+  const id = unique()
+  const first = await seedRequest(request, `Widget ${id} one`)
+  await seedRequest(request, `Widget ${id} two`)
+  await signInAdmin(page)
+  await page.goto(`/dashboard/requests?q=${encodeURIComponent(`Widget ${id}`)}&sort=oldest`)
+  await page.getByRole("link", { name: `Widget ${id} one` }).click()
+  await page.waitForURL(/\/dashboard\/requests\/[a-z0-9]+/)
+  await expect(page.getByText("1 of 2 open")).toBeVisible()
+
+  await page.getByRole("button", { name: /Visibility: Public/ }).click()
+  await page.getByRole("textbox", { name: "Internal note" }).fill(`Reproduced ${id}`)
+  await page.getByRole("button", { name: "Send" }).click()
+  await expect(page.getByText("Only the team sees this")).toBeVisible()
+
+  await triage(page).getByRole("button", { name: "Skip" }).click()
+  await expect(page.getByRole("heading", { level: 1, name: `Widget ${id} two` })).toBeVisible()
+
+  await page.goto(`/feedback/${first.id}`)
+  await expect(page.getByRole("heading", { level: 1, name: `Widget ${id} one` })).toBeVisible()
+  await expect(page.getByText(`Reproduced ${id}`)).toHaveCount(0)
+})
+
+test("a request posted for someone else carries their name", async ({ page }) => {
+  const id = unique()
+  await signInAdmin(page)
+  await page.getByRole("button", { name: "New request" }).click()
+  const dialog = page.getByRole("dialog")
+  await dialog.getByLabel("Title").fill(`Offline mode ${id}`)
+  await dialog.getByLabel("On behalf of (optional)").fill(`priya-${id}@example.com`)
+  await dialog.getByRole("textbox", { name: "Details" }).fill("Asked for this on a call.")
+  await dialog.getByRole("button", { name: "Send" }).click()
+  await page.waitForURL(/\/dashboard\/requests\/[a-z0-9]+/)
+  await expect(page.getByText(`priya-${id} posted this in Features`)).toBeVisible()
+})
+
+test("clearing filters clears the search field for good", async ({ page }) => {
+  await signInAdmin(page)
+  const field = page.getByRole("searchbox", { name: "Search requests" }).or(page.getByRole("textbox", { name: "Search requests" }))
+  const none = `nothing-like-this-${unique()}`
+  await field.fill(none)
+  await page.waitForURL(new RegExp(`q=${none}`))
+  await page.getByRole("button", { name: "Clear filters" }).click()
+  await page.waitForURL((url) => !url.searchParams.has("q"))
+  await expect(field).toHaveValue("")
+  // The cleared search doesn't come back once the debounce would have fired.
+  await page.waitForTimeout(600)
+  expect(new URL(page.url()).searchParams.has("q")).toBe(false)
+  await expect(field).toHaveValue("")
+})
+
+test("the collapsed rail keeps its links' names", async ({ page }) => {
+  await signInAdmin(page)
+  await page.getByRole("button", { name: "Collapse sidebar" }).click()
+  await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible()
+  const nav = page.locator("[data-sidebar=sidebar]")
+  await expect(nav.getByRole("link", { name: "Requests" })).toBeVisible()
+  await expect(nav.getByRole("link", { name: "Settings" })).toBeVisible()
+  // The labels are for screen readers only: each item is just its icon.
+  expect((await nav.getByRole("link", { name: "Settings" }).boundingBox())!.width).toBeLessThanOrEqual(44)
+  await page.getByRole("button", { name: "Expand sidebar" }).click()
+})
+
+test("clearing filters drops a search that hasn't reached the URL yet", async ({ page }) => {
+  await signInAdmin(page)
+  await page.goto("/dashboard/requests?board=no-such-board")
+  const field = page.getByRole("textbox", { name: "Search requests" }).or(page.getByRole("searchbox", { name: "Search requests" }))
+  const clear = page.getByRole("button", { name: "Clear filters" })
+  await expect(clear).toBeVisible()
+  await field.fill("dark")
+  await clear.click() // well inside the 300 ms before "dark" would reach the URL
+  await page.waitForURL((url) => !url.searchParams.has("board"))
+  await page.waitForTimeout(600)
+  expect(new URL(page.url()).searchParams.has("q")).toBe(false)
+  await expect(field).toHaveValue("")
+})

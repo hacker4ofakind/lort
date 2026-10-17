@@ -1,0 +1,276 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Lort's tokens (DESIGN.md). The raw tokens are plain custom properties on :root (light) and
+ * .dark (dark); shadcn's semantic names point at them, so shadcn components pick them up.
+ * Naming: Lort's "muted" text colour is shadcn's muted-foreground (text-muted-foreground);
+ * bg-muted is surface-2. Lort's "surface" is shadcn's card (bg-card, also bg-surface).
+ * The owner's primary colour is injected by app/layout.tsx and overrides --primary,
+ * --primary-foreground and --primary-text in both themes; primary-soft follows it here.
+ */
+:root {
+  --ground: #f3f1ef;
+  --ground-sunken: #ebe7e4;
+  --surface: #ffffff;
+  --surface-2: #efeae6;
+  --surface-3: #e4ddd8;
+  --border: #e3ddd8;
+  --border-strong: #cfc6bf;
+  --dot-empty: #8c817a;
+  --ink: #1e1a18;
+  --ink-2: #3d3532;
+  --muted-text: #655b55;
+  --primary: #cc3a6d;
+  --primary-foreground: #ffffff;
+  --primary-text: #b02a5a;
+  --primary-soft: color-mix(in srgb, var(--primary) 14%, #ffffff);
+  --keyline: #ffffff;
+  --focus: #1e1a18;
+  --danger-text: #b42318;
+  --note-bg: #fbf3df;
+  --note-border: #c9a961;
+  --note-ink: #7a5a12;
+  --status-pending: #b27703;
+  --status-reviewing: #e2520b;
+  --status-planned: #0284c7;
+  --status-progress: #9333ea;
+  --status-completed: #15913f;
+  --status-closed: #dc2626;
+  --status-pending-text: #8f5606;
+  --status-reviewing-text: #b23a0a;
+  --status-planned-text: #0369a1;
+  --status-progress-text: #7e22ce;
+  --status-completed-text: #13733a;
+  --status-closed-text: #b91c1c;
+  --lort-shadow-sticker: 0 2px 6px rgba(60, 30, 20, 0.28);
+  --lort-shadow-float: 0 14px 36px rgba(60, 40, 30, 0.18);
+  --lort-shadow-card-float: 0 8px 20px rgba(60, 40, 30, 0.12);
+  --lort-inset-sm: inset 0 1.7px 2.55px -0.85px rgba(60, 30, 20, 0.2);
+
+  --background: var(--ground);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --secondary: var(--surface-3);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--muted-text);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--ink);
+  --destructive: var(--danger-text);
+  --input: var(--border);
+  --ring: var(--focus);
+  --radius: 1rem;
+  --sidebar: var(--ground-sunken);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--surface-2);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--surface-2);
+  --sidebar-ring: var(--focus);
+}
+
+.dark {
+  --ground: #1a1716;
+  --ground-sunken: #151211;
+  --surface: #24201e;
+  --surface-2: #2c2725;
+  --surface-3: #352f2c;
+  --border: #352f2c;
+  --border-strong: #423a36;
+  --dot-empty: #7a6e67;
+  --ink: #f5efea;
+  --ink-2: #d8cdc5;
+  --muted-text: #b3a79e;
+  --primary-text: #f08aae;
+  --primary-soft: color-mix(in srgb, var(--primary) 18%, #1a1716);
+  --keyline: #f5efea;
+  --focus: #f5efea;
+  --danger-text: #ff8a7a;
+  --note-bg: #2a2418;
+  --note-border: #6b5a33;
+  --note-ink: #e8c77e;
+  --status-pending: #eab308;
+  --status-reviewing: #f97316;
+  --status-planned: #38bdf8;
+  --status-progress: #a855f7;
+  --status-completed: #22c55e;
+  --status-closed: #ef4444;
+  --status-pending-text: #eab308;
+  --status-reviewing-text: #f97316;
+  --status-planned-text: #38bdf8;
+  --status-progress-text: #c084fc;
+  --status-completed-text: #4ade80;
+  --status-closed-text: #f87171;
+  --lort-shadow-sticker: 0 3px 8px rgba(0, 0, 0, 0.45);
+  --lort-shadow-float: 0 14px 36px rgba(0, 0, 0, 0.5);
+  --lort-shadow-card-float: 0 8px 20px rgba(0, 0, 0, 0.35);
+  --lort-inset-sm: inset 0 1.7px 2.55px -0.85px rgba(0, 0, 0, 0.9);
+}
+
+@theme inline {
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-bricolage), var(--font-figtree), system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-figtree), system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-ground: var(--ground);
+  --color-ground-sunken: var(--ground-sunken);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-dot-empty: var(--dot-empty);
+  --color-primary-text: var(--primary-text);
+  --color-primary-soft: var(--primary-soft);
+  --color-keyline: var(--keyline);
+  --color-focus: var(--focus);
+  --color-danger: var(--danger-text);
+  --color-note-bg: var(--note-bg);
+  --color-note-border: var(--note-border);
+  --color-note-ink: var(--note-ink);
+  --color-status-pending: var(--status-pending);
+  --color-status-reviewing: var(--status-reviewing);
+  --color-status-planned: var(--status-planned);
+  --color-status-progress: var(--status-progress);
+  --color-status-completed: var(--status-completed);
+  --color-status-closed: var(--status-closed);
+  --color-status-pending-text: var(--status-pending-text);
+  --color-status-reviewing-text: var(--status-reviewing-text);
+  --color-status-planned-text: var(--status-planned-text);
+  --color-status-progress-text: var(--status-progress-text);
+  --color-status-completed-text: var(--status-completed-text);
+  --color-status-closed-text: var(--status-closed-text);
+
+  /* Lort's shadows. inset-shadow-sm replaces Tailwind's own and layers with shadow-float:
+     class="inset-shadow-sm shadow-float". */
+  --shadow-sticker: var(--lort-shadow-sticker);
+  --shadow-float: var(--lort-shadow-float);
+  --shadow-card-float: var(--lort-shadow-card-float);
+  --inset-shadow-sm: var(--lort-inset-sm);
+}
+
+@theme {
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-2xl: 28px;
+
+  --text-display-xl: 44px;
+  --text-display-xl--line-height: 46px;
+  --text-display-xl--letter-spacing: -0.03em;
+  --text-display-xl--font-weight: 800;
+  --text-display-l: 34px;
+  --text-display-l--line-height: 38px;
+  --text-display-l--letter-spacing: -0.025em;
+  --text-display-l--font-weight: 800;
+  --text-title: 20px;
+  --text-title--line-height: 25px;
+  --text-title--letter-spacing: -0.01em;
+  --text-title--font-weight: 700;
+  --text-count: 17px;
+  --text-count--line-height: 17px;
+  --text-count--font-weight: 800;
+  --text-body-lg: 17px;
+  --text-body-lg--line-height: 26px;
+  --text-body: 15px;
+  --text-body--line-height: 23px;
+  --text-label: 14px;
+  --text-label--line-height: 20px;
+  --text-label--font-weight: 600;
+  --text-caption: 13px;
+  --text-caption--line-height: 18px;
+  --text-caption--font-weight: 500;
+  --text-micro: 11px;
+  --text-micro--line-height: 14px;
+  --text-micro--font-weight: 700;
+
+  --animate-bone: bone 1.6s ease-in-out infinite;
+  --animate-countdown: countdown 60s linear forwards;
+  --animate-fresh: fresh 4s ease-out;
+  @keyframes countdown {
+    from {
+      transform: scaleX(1);
+    }
+    to {
+      transform: scaleX(0);
+    }
+  }
+  /* A request that just arrived over realtime starts tinted and fades to its normal surface. */
+  @keyframes fresh {
+    from {
+      background-color: var(--primary-soft);
+    }
+  }
+  @keyframes bone {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+  body {
+    @apply min-h-dvh bg-background;
+  }
+  /* The design's focus ring: 3px solid, 3px away, on everything focusable. */
+  :focus-visible {
+    @apply outline-3 outline-offset-3 outline-focus;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
