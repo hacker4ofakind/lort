@@ -1,0 +1,19 @@
+# An allowlist: only what the image is built from. Nothing else (.env, local data, the design
+# canvases) can reach a layer.
+*
+!server/
+!web/
+!docker-entrypoint.sh
+
+# Local state inside the allowed folders
+server/pb_data
+server/lort
+server/lort.exe
+web/node_modules
+web/.next
+web/test-results
+web/playwright-report
+web/e2e/.data
+web/*.tsbuildinfo
+**/.env
+**/.env.*

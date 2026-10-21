@@ -241,6 +241,8 @@ Warm, low-chroma neutrals with one accent the board owner chooses, plus six stat
 **Display Font:** Bricolage Grotesque (with Figtree, system-ui)
 **Body Font:** Figtree (with system-ui)
 
+Both ship in the repo as variable Latin woff2 files with their SIL OFL licences (`web/app/fonts`) and load through `next/font/local`, which adds size-matched fallbacks so text doesn't jump when a font arrives. Nothing is fetched from Google Fonts, at build time or in the browser.
+
 **Character:** A chunky, slightly quirky grotesque for headlines and vote counts, next to a clean, round, friendly sans for everything you read and click.
 
 ### Hierarchy

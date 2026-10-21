@@ -29,7 +29,7 @@
 ## Decisions this plan makes (recorded in the spec)
 
 - HTTPS uses PocketBase's built-in autocert (`serve <domain>`) instead of a separate certmagic setup. Same result, no extra dependency.
-- `setup.sh --reset-admin` will wrap PocketBase's built-in `lort superuser update <email> <password>` command; no custom CLI is needed.
+- `setup.sh --reset-admin` will wrap PocketBase's built-in `lort superuser update <email> <password>` command; no custom CLI is needed. *(Superseded in Phase 1C: `--reset-admin` runs Lort's own `lort reset-admin`, which reads the email and new password on the terminal so the password is never an argument. See the 1C plan.)*
 - Requests and comments are created through PocketBase's record API (`POST /api/collections/requests/records`), guarded by hooks, so multipart image uploads work without custom code. Votes, triage, merges and team actions go through `/api/lort`.
 
 ## Changes after review (PR #1)

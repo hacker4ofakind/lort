@@ -1,8 +1,19 @@
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+
 import AxeBuilder from "@axe-core/playwright"
 import { expect, type APIRequestContext, type Page } from "@playwright/test"
 
 export const API = "http://127.0.0.1:4052"
-export const ADMIN = { email: "admin@lort.test", password: "correcthorse-e2e" }
+
+// The e2e admin lives in test/e2e.env, which the scripts that start Lort read too.
+const e2eEnv = Object.fromEntries(
+  readFileSync(join(import.meta.dirname, "..", "..", "test", "e2e.env"), "utf8")
+    .split(/\r?\n/)
+    .filter((l) => l.includes("="))
+    .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]),
+)
+export const ADMIN = { email: e2eEnv.LORT_ADMIN_EMAIL, password: e2eEnv.LORT_ADMIN_PASSWORD }
 
 /** A suffix that keeps names unique across tests and both theme projects. */
 export const unique = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
