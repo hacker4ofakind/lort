@@ -22,6 +22,27 @@ export function changeMessage(ch: StatusChange): string | null {
   return null
 }
 
+export interface CompletionToastOptions {
+  /** Names the request: "Marked “Dark mode” as completed". The triage bar's page already shows it, so it leaves it out. */
+  title?: string
+  change: StatusChange
+  onUndo: () => void
+  /** Sonner id, so a request's toast can be dismissed when it moves again. */
+  id?: string | number
+  /** Email is on: the shipped emails wait out the undo window. */
+  email?: boolean
+}
+
+/**
+ * The 60-second Undo toast for a completion, from the triage bar and from a drop on the roadmap.
+ * The shipped emails (Phase 3) wait out the same window; their count joins the message here, once.
+ */
+export function completionToast({ title, change, onUndo, id, email }: CompletionToastOptions) {
+  if (change.to !== "completed") return
+  const message = title ? `Marked “${title}” as completed` : "Marked as completed"
+  undoToast({ message: email ? `${message}. People will hear about it in a minute.` : message, seconds: UNDO_SECONDS, onUndo, id })
+}
+
 /** Applies status actions from the triage bar and the status chip, with the spec's toasts. */
 export function useTriage(requestId: string) {
   const qc = useQueryClient()
@@ -52,12 +73,10 @@ export function useTriage(requestId: string) {
     try {
       const ch = await setStatus(pbAdmin, requestId, action)
       await refresh()
-      const message = changeMessage(ch)
-      if (ch.to === "completed") {
-        // The shipped emails (Phase 3) wait out the same window; the count joins the message then.
-        undoToast({ message: config.features.email ? `${message}. People will hear about it in a minute.` : message!, seconds: UNDO_SECONDS, onUndo: undo })
-      } else if (message) {
-        toast(message)
+      if (ch.to === "completed") completionToast({ change: ch, onUndo: undo, email: config.features.email })
+      else {
+        const message = changeMessage(ch)
+        if (message) toast(message)
       }
     } catch (err) {
       toast(errorMessage(err))

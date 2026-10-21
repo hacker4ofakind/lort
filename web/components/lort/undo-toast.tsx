@@ -8,6 +8,8 @@ export interface UndoToastOptions {
   /** Seconds the undo stays available; drawn as a countdown bar along the bottom. */
   seconds: number
   onUndo: () => void
+  /** Sonner toast id: showing another toast with the same id replaces it, and toast.dismiss(id) closes it. */
+  id?: string | number
 }
 
 /**
@@ -16,7 +18,7 @@ export interface UndoToastOptions {
  * Toaster's classNames.toast), so this renders only the content, not a second card. It closes
  * itself when the time is up; Undo closes it straight away.
  */
-export function undoToast({ message, seconds, onUndo }: UndoToastOptions) {
+export function undoToast({ message, seconds, onUndo, id: toastId }: UndoToastOptions) {
   return toast.custom(
     (id) => (
       <>
@@ -48,6 +50,6 @@ export function undoToast({ message, seconds, onUndo }: UndoToastOptions) {
         />
       </>
     ),
-    { duration: seconds * 1000 }
+    { duration: seconds * 1000, id: toastId }
   )
 }

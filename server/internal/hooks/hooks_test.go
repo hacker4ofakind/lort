@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -502,4 +503,116 @@ func TestTeamPostsOnBehalfOfSomeone(t *testing.T) {
 	if after, _ := f.app.CountRecords("requests"); after != before {
 		t.Errorf("requests = %d, want %d: a failed post must leave nothing behind", after, before)
 	}
+}
+
+func TestClientsCannotWriteStatusTime(t *testing.T) {
+	f := newFixture(t)
+	f.scenario(t, tests.ApiScenario{
+		Method: http.MethodPost, URL: "/api/collections/requests/records",
+		Headers:        map[string]string{"Authorization": testutil.Token(t, f.mara)},
+		Body:           strings.NewReader(`{"board":"` + f.features.Id + `","title":"Back-dated","statusChangedAt":"2001-01-01 00:00:00.000Z"}`),
+		ExpectedStatus: 200, ExpectedContent: []string{`"title":"Back-dated"`},
+	}, func(t *testing.T, app *tests.TestApp) {
+		r, err := app.FindFirstRecordByData("requests", "title", "Back-dated")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := r.GetDateTime("statusChangedAt").Time(); time.Since(got) > time.Minute {
+			t.Errorf("statusChangedAt = %s, want about now", got)
+		}
+	})
+	own := testutil.Request(t, f.app, f.features, f.mara, "Mine", "pending", 0)
+	f.scenario(t, tests.ApiScenario{
+		Method: http.MethodPatch, URL: "/api/collections/requests/records/" + own.Id,
+		Headers:        map[string]string{"Authorization": testutil.Token(t, f.mara)},
+		Body:           strings.NewReader(`{"statusChangedAt":"2001-01-01 00:00:00.000Z"}`),
+		ExpectedStatus: 404, ExpectedContent: []string{`"data":{}`},
+	}, nil)
+}
+
+func TestSuperuserStatusEditStampsTime(t *testing.T) {
+	f := newFixture(t)
+	su := testutil.Superuser(t, f.app, "root@example.com")
+	r := testutil.Request(t, f.app, f.features, f.mara, "Old one", "pending", 0)
+	testutil.SetStatusTime(t, f.app, r, time.Now().Add(-240*time.Hour))
+	f.scenario(t, tests.ApiScenario{
+		Method: http.MethodPatch, URL: "/api/collections/requests/records/" + r.Id,
+		Headers:        map[string]string{"Authorization": testutil.Token(t, su)},
+		Body:           strings.NewReader(`{"status":"reviewing"}`),
+		ExpectedStatus: 200, ExpectedContent: []string{`"status":"reviewing"`},
+	}, func(t *testing.T, app *tests.TestApp) {
+		got, _ := app.FindRecordById("requests", r.Id)
+		if time.Since(got.GetDateTime("statusChangedAt").Time()) > time.Minute {
+			t.Errorf("statusChangedAt = %s", got.GetDateTime("statusChangedAt"))
+		}
+	})
+}
+
+func TestTeamCanCreateStraightIntoARoadmapColumn(t *testing.T) {
+	f := newFixture(t)
+	f.scenario(t, tests.ApiScenario{
+		Method: http.MethodPost, URL: "/api/collections/requests/records",
+		Headers:        map[string]string{"Authorization": testutil.Token(t, f.admin)},
+		Body:           strings.NewReader(`{"board":"` + f.features.Id + `","title":"Widgets","roadmapStatus":"progress"}`),
+		ExpectedStatus: 200, ExpectedContent: []string{`"status":"progress"`},
+	}, func(t *testing.T, app *tests.TestApp) {
+		r, err := app.FindFirstRecordByData("requests", "title", "Widgets")
+		if err != nil {
+			t.Fatal(err)
+		}
+		acts, _ := app.FindRecordsByFilter("activity", "request = {:r}", "created,@rowid", 0, 0, dbx.Params{"r": r.Id})
+		if len(acts) != 2 || acts[0].GetString("kind") != "created" ||
+			acts[1].GetString("kind") != "status_changed" || acts[1].GetString("from") != "pending" || acts[1].GetString("to") != "progress" {
+			t.Fatalf("activity = %v", acts)
+		}
+		if acts[1].GetString("actor") != f.admin.Id {
+			t.Errorf("status row actor = %s, want the team member", acts[1].GetString("actor"))
+		}
+		if r.GetInt("upvoteCount") != 1 || !r.GetBool("visible") {
+			t.Errorf("votes=%d visible=%v", r.GetInt("upvoteCount"), r.GetBool("visible"))
+		}
+	})
+}
+
+func TestRoadmapStatusOnCreateIsTeamOnlyAndValidated(t *testing.T) {
+	f := newFixture(t)
+	create := func(token *core.Record, body string, status int, want string) {
+		f.scenario(t, tests.ApiScenario{
+			Method: http.MethodPost, URL: "/api/collections/requests/records",
+			Headers:        map[string]string{"Authorization": testutil.Token(t, token)},
+			Body:           strings.NewReader(body),
+			ExpectedStatus: status, ExpectedContent: []string{want},
+		}, nil)
+	}
+	board := `"board":"` + f.features.Id + `"`
+	create(f.mara, `{`+board+`,"title":"Sneaky","roadmapStatus":"planned"}`, 403, "Only the team can put a request on the roadmap.")
+	create(f.admin, `{`+board+`,"title":"Closed one","roadmapStatus":"closed"}`, 400, "Pick Planned or In progress.")
+	create(f.admin, `{`+board+`,"title":"Number one","roadmapStatus":3}`, 400, "Pick Planned or In progress.")
+	create(f.admin, `{`+board+`,"title":"Empty one","roadmapStatus":""}`, 400, "Pick Planned or In progress.")
+	if n, _ := f.app.CountRecords("requests"); n != 0 {
+		t.Errorf("%d requests saved by refused creates", n)
+	}
+}
+
+func TestRoadmapStatusWorksWithOnBehalf(t *testing.T) {
+	f := newFixture(t)
+	f.scenario(t, tests.ApiScenario{
+		Method: http.MethodPost, URL: "/api/collections/requests/records",
+		Headers:        map[string]string{"Authorization": testutil.Token(t, f.admin)},
+		Body:           strings.NewReader(`{"board":"` + f.features.Id + `","title":"For Devon","roadmapStatus":"planned","onBehalf":"devon@example.com"}`),
+		ExpectedStatus: 200, ExpectedContent: []string{`"status":"planned"`},
+	}, func(t *testing.T, app *tests.TestApp) {
+		r, _ := app.FindFirstRecordByData("requests", "title", "For Devon")
+		devon, err := app.FindAuthRecordByEmail("users", "devon@example.com")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.GetString("author") != devon.Id {
+			t.Errorf("author = %s, want Devon", r.GetString("author"))
+		}
+		moved, err := app.FindFirstRecordByFilter("activity", "request = {:r} && kind = 'status_changed'", dbx.Params{"r": r.Id})
+		if err != nil || moved.GetString("actor") != f.admin.Id {
+			t.Errorf("status row = %v, %v; actor should be the team member, not the author", moved, err)
+		}
+	})
 }

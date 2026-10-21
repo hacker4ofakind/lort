@@ -7,7 +7,7 @@ import { IconSearch } from "@tabler/icons-react"
 import { useConfig } from "@/app/providers"
 import { AccountMenu } from "@/components/board/account-menu"
 import { AuthGateProvider } from "@/components/board/auth-gate"
-import { BOARD_NAV, LORT_HOME } from "@/components/board/links"
+import { boardNav, LORT_HOME } from "@/components/board/links"
 import { SearchField } from "@/components/board/search-field"
 import { LogoMark } from "@/components/lort/logo-mark"
 import { Button } from "@/components/ui/button"
@@ -25,7 +25,7 @@ export function BoardShell({ children }: { children: React.ReactNode }) {
 
   const nav = (
     <nav aria-label="Board" className="flex gap-1">
-      {BOARD_NAV.map((item) => {
+      {boardNav(config).map((item) => {
         const current = isCurrent(pathname, item.href)
         return (
           <Link

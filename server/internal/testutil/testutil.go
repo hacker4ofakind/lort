@@ -4,9 +4,12 @@ package testutil
 import (
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
+	"github.com/pocketbase/pocketbase/tools/types"
 
 	"github.com/hacker4ofakind/lort/server/internal/schema"
 )
@@ -68,13 +71,26 @@ func Superuser(t testing.TB, app core.App, email string) *core.Record {
 	return r
 }
 
-// Request inserts a request directly, bypassing the create hooks.
+// Request inserts a request directly, bypassing the request create hooks. It sets
+// statusChangedAt to now, which is what the request would have on a real board.
 func Request(t testing.TB, app core.App, board, author *core.Record, title, status string, votes int) *core.Record {
 	t.Helper()
 	return save(t, app, "requests", map[string]any{
 		"board": board.Id, "author": author.Id, "title": title, "status": status,
-		"visible": true, "upvoteCount": votes,
+		"visible": true, "upvoteCount": votes, "statusChangedAt": time.Now(),
 	})
+}
+
+// SetStatusTime sets when a request entered its status without going through any hook.
+func SetStatusTime(t testing.TB, app core.App, r *core.Record, at time.Time) {
+	t.Helper()
+	dt, err := types.ParseDateTime(at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.DB().Update("requests", dbx.Params{"statusChangedAt": dt.String()}, dbx.HashExp{"id": r.Id}).Execute(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Token returns an auth token for r.

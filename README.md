@@ -93,7 +93,7 @@ cd web && LORT_E2E_CONTAINER=1 pnpm e2e
 
 ## Status
 
-Lort is early. Phase 1 works today: the public board and request pages, accounts, the dashboard with triage and merging, settings for branding, boards, tags and the team, and this setup. Next up are the roadmap and changelog, then email, webhooks and an MCP server, voice dictation, the embeddable widget and backups.
+Lort is early. Phases 1 and 2A work today: the public board and request pages, accounts, the dashboard with triage and merging, the public roadmap (with a shipped list) and a drag-and-drop roadmap in the dashboard, settings for branding, boards, tags, the roadmap and the team, and this setup. Next up is the changelog, then email, webhooks and an MCP server, voice dictation, the embeddable widget and backups.
 
 ## Licence
 

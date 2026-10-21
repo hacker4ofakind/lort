@@ -3,7 +3,7 @@ import {
   type InfiniteData,
   type QueryKey,
 } from "@tanstack/react-query"
-import type { Page, RequestDetail, RequestItem } from "@/lib/api"
+import type { Page, RequestDetail, RequestItem, Roadmap } from "@/lib/api"
 
 /** Query keys. Every request list starts with "requests" so one invalidation refreshes them all. */
 export const keys = {
@@ -14,6 +14,8 @@ export const keys = {
   similar: (q: string) => ["requests", "similar", q] as const,
   queue: (params: Record<string, string>, id: string) =>
     ["queue", params, id] as const,
+  roadmap: (scope: "board" | "team") => ["requests", "roadmap", scope] as const,
+  shipped: ["requests", "shipped"] as const,
   stats: ["stats"] as const,
   team: ["team"] as const,
   boards: ["boards"] as const,
@@ -32,21 +34,53 @@ export function makeQueryClient() {
 
 type Patch = (r: RequestItem) => RequestItem
 
-/** Every shape a "requests" query caches: a paged list, one page (the merge picker) or an array (similar). */
+/**
+ * Every shape a "requests" query caches: a paged list, one page (the merge picker), an array
+ * (similar), the roadmap's three columns, or one request (a detail page).
+ */
 type CachedRequests =
-  InfiniteData<Page<RequestItem>> | Page<RequestItem> | RequestItem[]
+  | InfiniteData<Page<RequestItem>>
+  | Page<RequestItem>
+  | RequestItem[]
+  | Roadmap
+  | RequestDetail
+
+const isObject = (d: unknown): d is Record<string, unknown> => typeof d === "object" && d !== null
+
+/** The one place that knows what each cached shape looks like. An unknown shape has no items. */
+export function itemsOf(data: unknown): RequestItem[] {
+  if (Array.isArray(data)) return data
+  if (!isObject(data)) return []
+  if (Array.isArray(data.pages)) return (data.pages as Page<RequestItem>[]).flatMap((p) => p.items)
+  if (Array.isArray(data.items)) return data.items as RequestItem[]
+  if (Array.isArray(data.planned)) {
+    const rm = data as unknown as Roadmap
+    return [...rm.planned, ...rm.progress, ...rm.completed]
+  }
+  if (typeof data.id === "string") return [data as unknown as RequestItem]
+  return []
+}
+
+/** data with fn applied to every request in it. A shape it doesn't know comes back unchanged. */
+export function mapItems<T>(data: T, fn: (r: RequestItem) => RequestItem): T {
+  const d: unknown = data
+  const each = (rs: RequestItem[]) => rs.map(fn)
+  if (Array.isArray(d)) return each(d) as T
+  if (!isObject(d)) return data
+  if (Array.isArray(d.pages))
+    return { ...d, pages: (d.pages as Page<RequestItem>[]).map((p) => ({ ...p, items: each(p.items) })) } as T
+  if (Array.isArray(d.items)) return { ...d, items: each(d.items as RequestItem[]) } as T
+  if (Array.isArray(d.planned)) {
+    const rm = d as unknown as Roadmap
+    return { ...rm, planned: each(rm.planned), progress: each(rm.progress), completed: each(rm.completed) } as T
+  }
+  if (typeof d.id === "string") return fn(d as unknown as RequestItem) as T
+  return data
+}
 
 /** Applies patch to request id inside one cached value, whatever its shape. */
 function patchCached<T>(data: T, id: string, patch: Patch): T {
-  const each = <R extends RequestItem>(r: R): R =>
-    r.id === id ? { ...r, ...patch(r) } : r
-  const page = (p: Page<RequestItem>) => ({ ...p, items: p.items.map(each) })
-  const d = data as CachedRequests | RequestDetail | undefined
-  if (!d) return data
-  if (Array.isArray(d)) return d.map(each) as T
-  if ("pages" in d) return { ...d, pages: d.pages.map(page) } as T
-  if ("items" in d) return page(d) as T
-  return each(d) as T
+  return mapItems(data, (r) => (r.id === id ? { ...r, ...patch(r) } : r))
 }
 
 /**
@@ -73,13 +107,7 @@ export function voteSnapshot(
   for (const [key, data] of qc.getQueriesData<CachedRequests>({
     queryKey: ["requests"],
   })) {
-    if (!data) continue
-    const items = Array.isArray(data)
-      ? data
-      : "pages" in data
-        ? data.pages.flatMap((p) => p.items)
-        : data.items
-    const r = items.find((i) => i.id === id)
+    const r = itemsOf(data).find((i) => i.id === id)
     if (r) out.push([key, { voted: r.voted, votes: r.votes }])
   }
   for (const [key, d] of qc.getQueriesData<RequestDetail>({

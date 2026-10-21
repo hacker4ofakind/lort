@@ -28,6 +28,7 @@ export interface RequestItem {
   awaitingApproval: boolean
   new: boolean // team view only: not opened by the team yet
   created: string
+  statusChangedAt: string // when it entered its current status
 }
 
 export interface Page<T> {
@@ -71,6 +72,18 @@ export interface StatusChange {
   from: Status
   to: Status
   roadmap: "added" | "removed" | ""
+}
+
+/** The statuses the roadmap shows, in column order. */
+export type RoadmapStatus = "planned" | "progress" | "completed"
+
+export interface Roadmap {
+  planned: RequestItem[]
+  progress: RequestItem[]
+  /** Shipped in the last 30 days, newest first. */
+  completed: RequestItem[]
+  /** Every completed request the viewer can see, including older ones. */
+  shipped: number
 }
 
 export interface QueueInfo {
@@ -143,6 +156,20 @@ export function markSeen(c: Client, id: string): Promise<void> {
 
 export function moveBoard(c: Client, id: string, board: string): Promise<void> {
   return c.send(`/api/lort/requests/${id}/board`, json({ board }))
+}
+
+/** The roadmap. 404 when the team has switched the public roadmap off. */
+export function roadmap(c: Client): Promise<Roadmap> {
+  return c.send("/api/lort/roadmap", {})
+}
+
+export function shipped(c: Client, page: number): Promise<Page<RequestItem>> {
+  return c.send("/api/lort/roadmap/shipped", { query: { page } })
+}
+
+/** Team only. from is the column the board showed, so a stale board can't undo a teammate's move. */
+export function moveOnRoadmap(c: Client, id: string, from: RoadmapStatus, to: RoadmapStatus): Promise<StatusChange> {
+  return c.send(`/api/lort/requests/${id}/roadmap`, json({ from, to }))
 }
 
 export function queue(c: Client, params: Record<string, string>, current: string): Promise<QueueInfo> {

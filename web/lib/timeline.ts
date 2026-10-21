@@ -4,9 +4,15 @@ export type TimelineEntry = { type: "event"; event: TimelineEvent } | { type: "c
 
 /** Timeline entries and top-level comments together, newest first. Replies stay inside their comment, oldest first. */
 export function buildTimeline(d: Pick<RequestDetail, "activity" | "thread">): TimelineEntry[] {
+  // The server sends both lists oldest first. Rows made in the same millisecond (a request
+  // created straight into Planned has "posted this" and "Pending → Planned") keep that order
+  // reversed, so the later row stays on top.
   const entries: Array<{ at: number; entry: TimelineEntry }> = [
     ...d.activity.map((event) => ({ at: Date.parse(event.created), entry: { type: "event" as const, event } })),
     ...d.thread.map((comment) => ({ at: Date.parse(comment.created), entry: { type: "comment" as const, comment } })),
   ]
-  return entries.sort((a, b) => b.at - a.at).map((e) => e.entry)
+  return entries
+    .map((e, i) => ({ ...e, i }))
+    .sort((a, b) => b.at - a.at || b.i - a.i)
+    .map((e) => e.entry)
 }

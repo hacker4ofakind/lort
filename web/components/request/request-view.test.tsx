@@ -20,6 +20,7 @@ const detail: RequestDetail = {
   awaitingApproval: false,
   new: false,
   created: "2026-10-11T10:00:00Z",
+  statusChangedAt: "2026-10-15T10:00:00Z",
   images: [],
   public: true,
   mergedInto: { id: "r2", name: "Sync conflicts" },

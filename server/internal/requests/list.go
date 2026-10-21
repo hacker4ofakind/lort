@@ -5,11 +5,12 @@ import (
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 // Query is what the board and the dashboard table ask for.
 type Query struct {
-	Sort       string   // trending (default), newest, oldest, top, updated
+	Sort       string   // trending (default), newest, oldest, top, updated, shipped
 	Statuses   []string // empty means every status
 	Boards     []string // board ids
 	Tags       []string // tag ids; a request matches if it has any of them
@@ -17,6 +18,8 @@ type Query struct {
 	Search     string
 	Page       int // 1-based
 	PerPage    int
+
+	StatusSince time.Time // not from the URL: only requests that entered their status at or after this
 }
 
 // Item is one request as the board and the table show it.
@@ -35,6 +38,7 @@ type Item struct {
 	AwaitingApproval bool      `json:"awaitingApproval"`
 	New              bool      `json:"new"`
 	Created          time.Time `json:"created"`
+	StatusChangedAt  time.Time `json:"statusChangedAt"` // when it entered its current status
 }
 
 type Ref struct {
@@ -59,13 +63,19 @@ type Page struct {
 // List returns one page of requests. viewer may be nil. team switches to the dashboard's
 // view: every board, hidden requests, internal comments counted, "New" markers.
 func (s *Service) List(q Query, viewer *core.Record, team bool) (Page, error) {
+	return s.list(q, viewer, viewer, team, false)
+}
+
+// list is List with the two viewers apart: scopeAs decides which requests are in scope (nil
+// drops the author's own-hidden exception), viewer decorates them (voted). noBody blanks Body.
+func (s *Service) list(q Query, scopeAs, viewer *core.Record, team, noBody bool) (Page, error) {
 	if q.PerPage <= 0 || q.PerPage > 100 {
 		q.PerPage = 20
 	}
 	if q.Page < 1 {
 		q.Page = 1
 	}
-	base, err := s.filter(q, viewer, team)
+	base, err := s.filter(q, scopeAs, team)
 	if err != nil {
 		return Page{}, err
 	}
@@ -80,7 +90,7 @@ func (s *Service) List(q Query, viewer *core.Record, team bool) (Page, error) {
 	if err != nil {
 		return Page{}, err
 	}
-	items, err := s.items(ids, viewer, team)
+	items, err := s.itemsWith(ids, viewer, team, noBody)
 	if err != nil {
 		return Page{}, err
 	}
@@ -106,6 +116,15 @@ func (s *Service) filter(q Query, viewer *core.Record, team bool) (*dbx.SelectQu
 	}
 	if len(q.Statuses) > 0 {
 		where = append(where, dbx.In("r.status", anys(q.Statuses)...))
+	}
+	if !q.StatusSince.IsZero() {
+		since, err := types.ParseDateTime(q.StatusSince)
+		if err != nil {
+			return nil, err
+		}
+		// Bound as PocketBase's stored text ("2006-01-02 15:04:05.000Z"), not RFC3339: the "T"
+		// sorts after the stored space and would put same-day rows on the wrong side.
+		where = append(where, dbx.NewExp("r.statusChangedAt >= {:since}", dbx.Params{"since": since.String()}))
 	}
 	if len(q.Boards) > 0 {
 		where = append(where, dbx.In("r.board", anys(q.Boards)...))
@@ -146,6 +165,8 @@ func order(sort string) []string {
 		return []string{"r.upvoteCount DESC", "r.created DESC"}
 	case "updated":
 		return []string{"r.updated DESC"}
+	case "shipped":
+		return []string{"r.statusChangedAt DESC", "r.created DESC"}
 	}
 	return []string{"r.trendScore DESC", "r.created DESC"}
 }
@@ -198,6 +219,11 @@ func (s *Service) Similar(text string, limit int) ([]Item, error) {
 
 // items loads records for ids (keeping their order) and decorates them.
 func (s *Service) items(ids []string, viewer *core.Record, team bool) ([]Item, error) {
+	return s.itemsWith(ids, viewer, team, false)
+}
+
+// itemsWith is items with the option to leave Body empty, for views that never show it.
+func (s *Service) itemsWith(ids []string, viewer *core.Record, team, noBody bool) ([]Item, error) {
 	out := make([]Item, 0, len(ids))
 	if len(ids) == 0 {
 		return out, nil
@@ -256,6 +282,10 @@ func (s *Service) items(ids []string, viewer *core.Record, team bool) ([]Item, e
 			Comments: comments[r.Id], Votes: r.GetInt("upvoteCount"), Voted: voted[r.Id],
 			Visible: r.GetBool("visible"), AwaitingApproval: r.GetBool("awaitingApproval"),
 			Created: r.GetDateTime("created").Time(), Tags: []Ref{},
+			StatusChangedAt: r.GetDateTime("statusChangedAt").Time(),
+		}
+		if noBody {
+			it.Body = ""
 		}
 		if team {
 			it.New = r.GetDateTime("teamSeenAt").IsZero()

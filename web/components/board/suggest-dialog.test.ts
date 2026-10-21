@@ -24,3 +24,13 @@ describe("newRequestPayload", () => {
     expect(newRequestPayload(base)).not.toHaveProperty("onBehalf")
   })
 })
+
+describe("newRequestPayload on the roadmap", () => {
+  const base = { board: "b1", title: "Widgets", body: "", tags: [], images: [], internal: false, website: "" }
+
+  it("sends roadmapStatus only when the team picked a column", () => {
+    expect(newRequestPayload({ ...base, roadmapStatus: "planned" })).toMatchObject({ roadmapStatus: "planned" })
+    expect(newRequestPayload({ ...base, roadmapStatus: "progress" })).toMatchObject({ roadmapStatus: "progress" })
+    expect(newRequestPayload(base)).not.toHaveProperty("roadmapStatus")
+  })
+})

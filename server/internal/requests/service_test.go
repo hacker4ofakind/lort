@@ -15,6 +15,7 @@ import (
 
 func setup(t *testing.T) (*requests.Service, core.App, *core.Record, *core.Record) {
 	app := testutil.NewApp(t)
+	requests.BindStatusTime(app)
 	board := testutil.Board(t, app, "Features", true, false)
 	mara := testutil.User(t, app, "mara@example.com")
 	return requests.New(app), app, board, mara

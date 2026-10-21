@@ -23,6 +23,7 @@ const row: RequestItem = {
   awaitingApproval: true,
   new: true,
   created: "2026-10-14T10:00:00Z",
+  statusChangedAt: "2026-10-14T10:00:00Z",
 }
 
 describe("RequestsTable", () => {

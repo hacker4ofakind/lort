@@ -20,6 +20,10 @@ var (
 	ErrNotVoting = errors.New("this request can't take votes any more")
 	ErrUndoGone  = errors.New("it's too late to undo that")
 	ErrBadMerge  = errors.New("pick a different request to merge into")
+
+	// These two are shown to the team as they are, so they read as sentences.
+	ErrNotOnRoadmap = errors.New("That request isn't on the roadmap any more.")
+	ErrMoved        = errors.New("Someone moved that card meanwhile.")
 )
 
 // UndoWindow is how long a completion can be undone (and how long its emails wait).
@@ -150,6 +154,25 @@ func (s *Service) Recount(app core.App, requestID string) error {
 
 // SetStatus applies a triage action. actor is the team member's users profile.
 func (s *Service) SetStatus(requestID string, action status.Action, actor *core.Record) (Change, error) {
+	return s.changeStatus(requestID, actor, func(r *core.Record) (status.Status, error) {
+		to, err := status.Next(status.Status(r.GetString("status")), action)
+		if err != nil {
+			return "", err
+		}
+		if action == status.Accept && r.GetBool("awaitingApproval") {
+			r.Set("awaitingApproval", false)
+			r.Set("visible", true)
+		}
+		return to, nil
+	})
+}
+
+// changeStatus is the one place a request's status changes by a team decision: it finds the
+// request, lets decide pick the new status (and apply side effects to the record), then saves
+// and logs the change in one transaction. decide returning the status the request already has
+// means there is nothing to do: no save and no timeline entry. Completion emails, webhooks and
+// the like belong here, so every route that changes a status gets them.
+func (s *Service) changeStatus(requestID string, actor *core.Record, decide func(r *core.Record) (status.Status, error)) (Change, error) {
 	var ch Change
 	err := s.App.RunInTransaction(func(tx core.App) error {
 		r, err := s.find(tx, requestID)
@@ -157,20 +180,21 @@ func (s *Service) SetStatus(requestID string, action status.Action, actor *core.
 			return err
 		}
 		from := status.Status(r.GetString("status"))
-		to, err := status.Next(from, action)
+		since := r.GetDateTime("statusChangedAt") // when it entered `from`, for Undo
+		to, err := decide(r)
 		if err != nil {
 			return err
 		}
-		r.Set("status", string(to))
-		if action == status.Accept && r.GetBool("awaitingApproval") {
-			r.Set("awaitingApproval", false)
-			r.Set("visible", true)
+		if to == from {
+			ch = Change{From: from, To: to}
+			return nil
 		}
+		r.Set("status", string(to))
 		if err := tx.Save(r); err != nil {
 			return err
 		}
 		ch = Change{From: from, To: to, Roadmap: status.RoadmapChange(from, to)}
-		return logActivity(tx, r.Id, actor, "status_changed", string(from), string(to))
+		return logActivityAt(tx, r.Id, actor, "status_changed", string(from), string(to), since)
 	})
 	return ch, err
 }
@@ -194,12 +218,26 @@ func (s *Service) UndoComplete(requestID string) (Change, error) {
 			return ErrUndoGone
 		}
 		from := status.Status(last[0].GetString("from"))
+		if err := tx.Delete(last[0]); err != nil {
+			return err
+		}
+		// The request goes back to the time it entered the old status. The completion row
+		// remembers it; one logged before that field existed falls back to the timeline.
+		since := last[0].GetDateTime("statusSince")
+		if since.IsZero() {
+			if since, err = previousStatusTime(tx, r); err != nil {
+				return err
+			}
+		}
 		r.Set("status", string(from))
+		r.Set("statusChangedAt", since)
+		release := keepStatusTime(r)
+		defer release()
 		if err := tx.Save(r); err != nil {
 			return err
 		}
 		ch = Change{From: status.Completed, To: from, Roadmap: status.RoadmapChange(status.Completed, from)}
-		return tx.Delete(last[0])
+		return nil
 	})
 	return ch, err
 }
@@ -296,6 +334,11 @@ func (s *Service) MarkSeen(requestID string) error {
 }
 
 func logActivity(app core.App, requestID string, actor *core.Record, kind, from, to string) error {
+	return logActivityAt(app, requestID, actor, kind, from, to, types.DateTime{})
+}
+
+// logActivityAt is logActivity for a status change, with the time the request entered `from`.
+func logActivityAt(app core.App, requestID string, actor *core.Record, kind, from, to string, since types.DateTime) error {
 	c, err := app.FindCollectionByNameOrId("activity")
 	if err != nil {
 		return err
@@ -309,6 +352,9 @@ func logActivity(app core.App, requestID string, actor *core.Record, kind, from,
 	a.Set("kind", kind)
 	a.Set("from", from)
 	a.Set("to", to)
+	if !since.IsZero() {
+		a.Set("statusSince", since)
+	}
 	return app.Save(a)
 }
 
@@ -324,4 +370,10 @@ func (s *Service) AfterCreate(app core.App, r, author *core.Record) error {
 		}
 		return logActivity(tx, r.Id, author, "created", "", "")
 	})
+}
+
+// LogJoinedRoadmap records that a request was created straight into a roadmap column, as the
+// team member who did it, so the timeline reads "posted this", then "Pending → Planned".
+func (s *Service) LogJoinedRoadmap(app core.App, r, actor *core.Record, to status.Status) error {
+	return logActivityAt(app, r.Id, actor, "status_changed", string(status.Pending), string(to), r.GetDateTime("statusChangedAt"))
 }
