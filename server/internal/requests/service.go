@@ -231,7 +231,7 @@ func (s *Service) UndoComplete(requestID string) (Change, error) {
 		}
 		r.Set("status", string(from))
 		r.Set("statusChangedAt", since)
-		release := keepStatusTime(r.Id)
+		release := keepStatusTime(r)
 		defer release()
 		if err := tx.Save(r); err != nil {
 			return err

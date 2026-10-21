@@ -7,12 +7,12 @@ import { columnOf } from "@/lib/roadmap"
 
 const item = { id: "r1", title: "Dark mode", votes: 1, voted: false, visible: true, board: { id: "b", name: "Features" }, tags: [], author: { id: "u", name: "Mara", avatar: "", team: false } } as unknown as RequestItem
 
-function column(over: { collapsed: boolean; fresh: { id: string; focus: boolean } | null }) {
+function column(over: { collapsed: boolean; fresh: { id: string; focus: boolean } | null; items?: RequestItem[] }) {
   return (
     <DndContext>
       <RoadmapColumn
         col={columnOf("completed")}
-        items={[item]}
+        items={over.items ?? [item]}
         collapsed={over.collapsed}
         busy={new Set()}
         fresh={over.fresh}
@@ -31,6 +31,19 @@ describe("RoadmapColumn focus after a drop", () => {
     const strip = screen.getByRole("button", { name: "Completed, 1 in the last 30 days. Expand" })
     expect(strip).not.toHaveFocus()
     rerender(column({ collapsed: true, fresh: { id: "r1", focus: true } }))
+    expect(strip).toHaveFocus()
+  })
+
+  it("focuses the strip again for a second keyboard drop while the first is still highlighted", () => {
+    const two = [item, { ...item, id: "r2", title: "Tags" }]
+    const { rerender } = render(column({ collapsed: true, fresh: null, items: [item] }))
+    const strip = screen.getByRole("button", { name: /Expand$/ })
+    rerender(column({ collapsed: true, fresh: { id: "r1", focus: true }, items: [item] }))
+    expect(strip).toHaveFocus()
+
+    strip.blur() // the next card's source is gone and focus is on the page again
+    expect(strip).not.toHaveFocus()
+    rerender(column({ collapsed: true, fresh: { id: "r2", focus: true }, items: two }))
     expect(strip).toHaveFocus()
   })
 

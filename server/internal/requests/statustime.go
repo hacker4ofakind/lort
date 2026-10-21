@@ -9,16 +9,18 @@ import (
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
-// restoring holds the requests whose statusChangedAt is being put back by Undo. Inferring that
+// restoring holds the record instances whose statusChangedAt Undo is putting back. Inferring that
 // from the value (it differs from the stored one) fails when the restored time happens to equal
-// the stored millisecond, so the caller says so outright.
+// the stored millisecond, so the caller says so outright. It is keyed by the instance being
+// saved, not the request's id: another save of the same request (a superuser's edit, say) is a
+// different instance and is still stamped.
 var restoring sync.Map
 
-// keepStatusTime tells the stamp hook to leave request id's statusChangedAt as the caller set it,
-// until the returned function is called.
-func keepStatusTime(id string) (release func()) {
-	restoring.Store(id, struct{}{})
-	return func() { restoring.Delete(id) }
+// keepStatusTime tells the stamp hook to leave r's statusChangedAt as the caller set it when this
+// very record is saved, until the returned function is called.
+func keepStatusTime(r *core.Record) (release func()) {
+	restoring.Store(r, struct{}{})
+	return func() { restoring.Delete(r) }
 }
 
 // BindStatusTime keeps requests.statusChangedAt true for every write path: a new request gets
@@ -35,7 +37,7 @@ func BindStatusTime(app core.App) {
 	})
 	app.OnRecordUpdate("requests").BindFunc(func(e *core.RecordEvent) error {
 		orig := e.Record.Original()
-		_, keep := restoring.Load(e.Record.Id)
+		_, keep := restoring.Load(e.Record)
 		if !keep && orig != nil &&
 			e.Record.GetString("status") != orig.GetString("status") &&
 			e.Record.GetDateTime("statusChangedAt").Time().Equal(orig.GetDateTime("statusChangedAt").Time()) {

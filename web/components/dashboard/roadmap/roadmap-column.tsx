@@ -49,9 +49,11 @@ export function RoadmapColumn({ col, items, collapsed, busy, fresh, hintId, onTo
   // strip shows none), and the one it left is gone: focus the strip, which says what is inside.
   const strip = useRef<HTMLButtonElement | null>(null)
   const focusStrip = collapsed && !!fresh?.focus && items.some((i) => i.id === fresh.id)
+  // `fresh` is a new object for every drop, so a second drop into the same collapsed column (while
+  // the first is still highlighted) focuses the strip again.
   useEffect(() => {
     if (focusStrip) strip.current?.focus()
-  }, [focusStrip])
+  }, [focusStrip, fresh])
 
   if (collapsed) {
     return (
