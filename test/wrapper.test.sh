@@ -21,7 +21,7 @@ bad() {
 }
 
 # Tools setup.sh may use, linked into a bin folder we control (so git and docker can be absent).
-tools="bash sh uname awk df cat grep sed id head tr stat wc"
+tools="bash sh uname awk df cat grep sed id head tr stat wc chmod"
 case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*) windows=yes ;; *) windows=no ;; esac
 # Git Bash's tools need their DLLs next to them, and its /usr/bin has no git or docker.
 # (setup.sh calls icacls by its full path; System32 stays off PATH because it can hold docker.)
@@ -139,8 +139,15 @@ mkbin "$dir/bin" with-git
 fake_docker "$dir/bin"
 cp "$root/setup.sh" "$dir/work/"
 printf 'LORT_ENCRYPTION_KEY=abcdefghijklmnopqrstuvwxyz012345\n' >"$dir/work/.env"
+# Wide open, with explicit (not inherited) entries on Windows.
+if [ "$windows" = yes ]; then
+	MSYS_NO_PATHCONV=1 "$icacls" "$(cygpath -w "$dir/work/.env")" /grant '*S-1-5-18:(F)' '*S-1-1-0:(R)' >/dev/null
+else
+	chmod 644 "$dir/work/.env"
+fi
 (cd "$dir/work" && FAKE_LOG="$dir/log" PATH="$dir/bin${base:+:$base}" bash ./setup.sh </dev/null >/dev/null 2>&1)
 if grep -q "abcdefghijklmnopqrstuvwxyz012345" "$dir/work/.env"; then ok "an existing .env keeps its key"; else bad "the key was wiped"; fi
+if grep -q "env-at-wizard size=[1-9][0-9]* perms=600" "$dir/log"; then ok "an existing .env is made owner-only"; else bad "existing .env permissions: $(cat "$dir/log")"; fi
 
 FAKE_STOPPED=yes scenario with-git with-docker
 if called "--container-running=no|--container-exists=yes"; then ok "a stopped lort container is reported as existing"; else bad "stopped: $(cat "$log")"; fi

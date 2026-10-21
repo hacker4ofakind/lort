@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/hacker4ofakind/lort/server/internal/config"
@@ -145,13 +144,26 @@ func (a AppAdmin) find(email string) (*core.Record, error) {
 		return r, nil
 	}
 	// The superusers' index is case-sensitive, so an owner who types their email in another
-	// case still means their admin: accept it when exactly one admin matches.
-	rs, err := a.App.FindRecordsByFilter(core.CollectionNameSuperusers, "email:lower = {:email}", "", 2, 0,
-		dbx.Params{"email": strings.ToLower(email)})
-	if err != nil || len(rs) != 1 {
+	// case still means their admin: accept it when exactly one admin matches. Compared in Go,
+	// because SQLite's LOWER only folds ASCII (É and é would differ). Boards have few admins.
+	all, err := a.App.FindAllRecords(core.CollectionNameSuperusers)
+	if err != nil {
 		return nil, ErrNoSuchAdmin
 	}
-	return rs[0], nil
+	var match *core.Record
+	for _, r := range all {
+		if !strings.EqualFold(r.Email(), email) {
+			continue
+		}
+		if match != nil {
+			return nil, ErrNoSuchAdmin // two admins differ only by case: don't guess
+		}
+		match = r
+	}
+	if match == nil {
+		return nil, ErrNoSuchAdmin
+	}
+	return match, nil
 }
 
 func (a AppAdmin) Exists(_ context.Context, email string) (bool, error) {

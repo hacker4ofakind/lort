@@ -48,3 +48,24 @@ func TestResetWontGuessBetweenAdminsThatDifferByCase(t *testing.T) {
 		t.Error("the exact email should still work")
 	}
 }
+
+func TestResetFoldsUnicodeCase(t *testing.T) {
+	ctx := context.Background()
+	app := testutil.NewApp(t)
+	testutil.Superuser(t, app, "Éve@lort.test")
+	a := AppAdmin{App: app}
+	if ok, _ := a.Exists(ctx, "éve@lort.test"); !ok {
+		t.Error("éve@lort.test should find Éve@lort.test")
+	}
+
+	both := testutil.NewApp(t)
+	testutil.Superuser(t, both, "Éve@lort.test")
+	testutil.Superuser(t, both, "éve@lort.test")
+	b := AppAdmin{App: both}
+	if ok, _ := b.Exists(ctx, "éVE@LORT.TEST"); ok {
+		t.Error("with Éve and éve both saved, éVE should be ambiguous")
+	}
+	if err := b.Reset(ctx, "Éve@lort.test", "new password 1"); err != nil {
+		t.Errorf("the exact email should still win: %v", err)
+	}
+}

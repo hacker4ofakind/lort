@@ -138,16 +138,23 @@ if [ "$os" = linux ] && [ -r /proc/meminfo ]; then
 	fi
 fi
 
-# 4. .env: created empty and owner-only if it's missing, never emptied if it exists (it holds
-# the key to your board's settings). The wizard fills it in.
+# 4. .env: created empty if it's missing, never emptied if it exists (it holds the key to your
+# board's settings), and made owner-only every run. The wizard fills it in, and refuses a symlink.
 if [ ! -e .env ] && [ ! -L .env ]; then
 	(
 		umask 077
 		: >.env
 	)
-	if [ "$os" = windows ]; then # NTFS ignores umask: give the file to this user alone
+fi
+if [ -f .env ] && [ ! -L .env ]; then
+	if [ "$os" = windows ]; then
+		# NTFS ignores umask. /reset drops explicit entries (some machines add SYSTEM and
+		# Administrators), then only this user is granted access.
 		icacls="$(cygpath -u "${SYSTEMROOT:-C:\Windows}")/System32/icacls.exe"
+		MSYS_NO_PATHCONV=1 "$icacls" .env /reset >/dev/null
 		MSYS_NO_PATHCONV=1 "$icacls" .env /inheritance:r /grant:r "${USERNAME:-$(whoami)}:(R,W)" >/dev/null
+	else
+		chmod 600 .env
 	fi
 fi
 

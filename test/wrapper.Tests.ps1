@@ -84,7 +84,17 @@ exit 0
         if (-not $NoGit) { $tools += 'git' }
         Build-FakeBin -Dir (Join-Path $dir 'bin') -Tools $tools
         Copy-Item $script:Source (Join-Path $work 'setup.ps1')
-        if ($PSBoundParameters.ContainsKey('ExistingEnv')) { Set-Content -LiteralPath (Join-Path $work '.env') -Value $ExistingEnv -NoNewline }
+        if ($PSBoundParameters.ContainsKey('ExistingEnv')) {
+            $envFile = Join-Path $work '.env'
+            Set-Content -LiteralPath $envFile -Value $ExistingEnv -NoNewline
+            # Wide open, with explicit (not inherited) entries, like a file some runners and
+            # hand edits produce.
+            if ($IsWindows) {
+                & "$env:SystemRoot\System32\icacls.exe" $envFile /grant '*S-1-5-18:(F)' '*S-1-1-0:(R)' | Out-Null
+            } else {
+                chmod 644 $envFile
+            }
+        }
         $log = Join-Path $dir 'calls.log'
         $null = New-Item -ItemType File -Path $log
 
@@ -172,9 +182,11 @@ Describe 'setup.ps1' {
         }
     }
 
-    It 'never empties an existing .env' {
+    It 'never empties an existing .env, and makes it owner-only' {
         $r = Invoke-Setup -ExistingEnv "LORT_ENCRYPTION_KEY=abcdefghijklmnopqrstuvwxyz012345`n"
         $r.Env | Should -Match 'abcdefghijklmnopqrstuvwxyz012345'
+        $seen = @($r.Calls | Where-Object { $_ -like 'env-a*' }) -join ' / '
+        $seen | Should -Match '^env-at-wizard size=\d+ private=True$'
     }
 
     It 'passes git describe as the version' {

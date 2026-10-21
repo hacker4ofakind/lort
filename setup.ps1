@@ -144,14 +144,20 @@ if ($os -eq 'linux' -and (Test-Path /proc/meminfo)) {
     }
 }
 
-# 4. .env: created empty and owner-only if it's missing, never emptied if it exists (it holds
-# the key to your board's settings). The wizard fills it in.
+# 4. .env: created empty if it's missing, never emptied if it exists (it holds the key to your
+# board's settings), and made owner-only every run. The wizard fills it in, and refuses a symlink.
 $envPath = Join-Path (Get-Location).Path '.env'
 if (-not (Test-Path -LiteralPath $envPath)) {
     $null = New-Item -ItemType File -Path $envPath
+}
+if (-not (Get-Item -Force -LiteralPath $envPath).LinkType) {
     if ($IsWindows) {
-        $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-        & "$env:SystemRoot\System32\icacls.exe" $envPath /inheritance:r /grant:r "${me}:(R,W)" | Out-Null
+        # /reset drops explicit entries (some machines add SYSTEM and Administrators), then only
+        # this user is granted access.
+        $icacls = "$env:SystemRoot\System32\icacls.exe"
+        $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        & $icacls $envPath /reset | Out-Null
+        & $icacls $envPath /inheritance:r /grant:r "*${me}:(R,W)" | Out-Null
     } else {
         chmod 600 $envPath
     }
