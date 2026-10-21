@@ -79,10 +79,12 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-function Test-LortRunning {
+# The lort container's state: 'true' (running), 'false' (stopped) or '' (none).
+function Get-LortState {
     $state = docker inspect -f '{{.State.Running}}' lort 2>$null
-    ($LASTEXITCODE -eq 0) -and ("$state".Trim() -eq 'true')
+    if ($LASTEXITCODE -eq 0) { "$state".Trim() } else { '' }
 }
+function Test-LortRunning { (Get-LortState) -eq 'true' }
 
 # Interactive flags: -it with a terminal, -i for piped input (scripts, coding agents).
 $tty = if ([Console]::IsInputRedirected) { '-i' } else { '-it' }
@@ -149,7 +151,7 @@ if (-not (Test-Path -LiteralPath $envPath)) {
     $null = New-Item -ItemType File -Path $envPath
     if ($IsWindows) {
         $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-        icacls $envPath /inheritance:r /grant:r "${me}:(R,W)" | Out-Null
+        & "$env:SystemRoot\System32\icacls.exe" $envPath /inheritance:r /grant:r "${me}:(R,W)" | Out-Null
     } else {
         chmod 600 $envPath
     }
@@ -184,10 +186,13 @@ try {
 Write-Line ''
 
 # 6. The wizard.
-$containerRunning = if (Test-LortRunning) { 'yes' } else { 'no' }
+# Running: setup leaves its database alone. Stopped: it still holds the name lort.
+$state = Get-LortState
+$containerRunning = if ($state -eq 'true') { 'yes' } else { 'no' }
+$containerExists = if ($state) { 'yes' } else { 'no' }
 docker run --rm $tty --entrypoint lort `
     --cap-drop=ALL --cap-add=CHOWN --cap-add=SETUID --cap-add=SETGID --cap-add=DAC_OVERRIDE --cap-add=FOWNER `
     --security-opt no-new-privileges `
     -v "$((Get-Location).Path):/work" -v lort_data:/data `
-    lort setup --workdir /work --ports-free=$portsFree --container-running=$containerRunning --os=$os --script=./setup.ps1
+    lort setup --workdir /work --ports-free=$portsFree --container-running=$containerRunning --container-exists=$containerExists --os=$os --script=./setup.ps1
 exit $LASTEXITCODE

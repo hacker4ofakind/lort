@@ -6,8 +6,10 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/apis"
@@ -137,5 +139,31 @@ func TestTLSLogShowsCertificateTroubleOnce(t *testing.T) {
 		if strings.Contains(got, noise) {
 			t.Errorf("scanner noise %q reached the log:\n%s", noise, got)
 		}
+	}
+}
+
+func TestHealthcheckFailsWhenTheBodyNeverFinishes(t *testing.T) {
+	release := make(chan struct{})
+	defer close(release)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("partial"))
+		w.(http.Flusher).Flush()
+		select { // stalls mid-body
+		case <-release:
+		case <-r.Context().Done():
+		}
+	}))
+	defer srv.Close()
+	err := checkHealth(&http.Client{Timeout: 300 * time.Millisecond}, srv.URL)
+	if err == nil {
+		t.Fatal("a page that never finishes counted as healthy")
+	}
+
+	ok := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("fine")) }))
+	defer ok.Close()
+	if err := checkHealth(&http.Client{Timeout: time.Second}, ok.URL); err != nil {
+		t.Errorf("healthy server: %v", err)
 	}
 }

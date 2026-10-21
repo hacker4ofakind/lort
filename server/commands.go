@@ -53,6 +53,7 @@ func setupCmd(args []string) int {
 	dataDir := fs.String("data", envOr("LORT_DATA", "/data/pb_data"), "PocketBase's data folder")
 	portsFree := fs.String("ports-free", "yes", "whether ports 80 and 443 are free: yes or no")
 	running := fs.String("container-running", "no", "whether a container named lort is running: yes or no")
+	exists := fs.String("container-exists", "no", "whether a container named lort exists, running or stopped: yes or no")
 	osName := fs.String("os", "linux", "linux, mac or windows")
 	script := fs.String("script", "", "the setup script to name in advice (default: from --os)")
 	if err := fs.Parse(args); err != nil {
@@ -60,7 +61,7 @@ func setupCmd(args []string) int {
 	}
 	t := setup.NewTerminal(os.Stdin, os.Stdout)
 	interruptible(t)
-	o := setup.Options{Workdir: *workdir, DataDir: *dataDir, PortsFree: *portsFree == "yes", ContainerRunning: *running == "yes", OS: *osName, Script: *script}
+	o := setup.Options{Workdir: *workdir, DataDir: *dataDir, PortsFree: *portsFree == "yes", ContainerRunning: *running == "yes", ContainerExists: *exists == "yes" || *running == "yes", OS: *osName, Script: *script}
 	if err := setup.Run(context.Background(), setup.NewHost(t, *dataDir), o); err != nil {
 		fmt.Fprintf(os.Stderr, "\n%s\n", sentence(err))
 		return 1

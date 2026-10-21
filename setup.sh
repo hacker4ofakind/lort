@@ -90,7 +90,9 @@ if ! command -v git >/dev/null 2>&1; then
 	exit 1
 fi
 
-running() { [ "$(docker inspect -f '{{.State.Running}}' lort 2>/dev/null || true)" = true ]; }
+# The lort container's state: true (running), false (stopped) or empty (none).
+lort_state() { docker inspect -f '{{.State.Running}}' lort 2>/dev/null || true; }
+running() { [ "$(lort_state)" = true ]; }
 
 # Interactive flags: -it with a terminal, -i for piped input (scripts, coding agents).
 if [ -t 0 ]; then tty=-it; else tty=-i; fi
@@ -144,7 +146,8 @@ if [ ! -e .env ] && [ ! -L .env ]; then
 		: >.env
 	)
 	if [ "$os" = windows ]; then # NTFS ignores umask: give the file to this user alone
-		MSYS_NO_PATHCONV=1 icacls .env /inheritance:r /grant:r "${USERNAME:-$(whoami)}:(R,W)" >/dev/null
+		icacls="$(cygpath -u "${SYSTEMROOT:-C:\Windows}")/System32/icacls.exe"
+		MSYS_NO_PATHCONV=1 "$icacls" .env /inheritance:r /grant:r "${USERNAME:-$(whoami)}:(R,W)" >/dev/null
 	fi
 fi
 
@@ -174,11 +177,14 @@ say ""
 # 6. The wizard.
 workdir=$PWD
 if [ "$os" = windows ]; then workdir=$(pwd -W); fi
-if running; then container_running=yes; else container_running=no; fi
+# Running: setup leaves its database alone. Stopped: it still holds the name lort.
+state=$(lort_state)
+if [ "$state" = true ]; then container_running=yes; else container_running=no; fi
+if [ -n "$state" ]; then container_exists=yes; else container_exists=no; fi
 code=0
 MSYS_NO_PATHCONV=1 docker run --rm "$tty" --entrypoint lort \
 	--cap-drop=ALL --cap-add=CHOWN --cap-add=SETUID --cap-add=SETGID --cap-add=DAC_OVERRIDE --cap-add=FOWNER \
 	--security-opt no-new-privileges \
 	-v "$workdir:/work" -v lort_data:/data \
-	lort setup --workdir /work --ports-free="$ports_free" --container-running="$container_running" --os="$os" --script=./setup.sh || code=$?
+	lort setup --workdir /work --ports-free="$ports_free" --container-running="$container_running" --container-exists="$container_exists" --os="$os" --script=./setup.sh || code=$?
 exit "$code"

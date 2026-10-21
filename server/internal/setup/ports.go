@@ -87,9 +87,15 @@ func finish(p Prompter, o Options, addr address, mode Mode) {
 		p.Say("Ports 80 and 443 are free, so Lort will get its own HTTPS certificate from Let's Encrypt.")
 		p.Say("")
 	}
-	if o.ContainerRunning {
+	// The name lort stays taken until the old container is removed, running or not.
+	switch {
+	case o.ContainerRunning:
 		p.Say("Lort is already running. To start it with these settings, stop and remove it first (your data stays in the lort_data volume):")
 		p.Say("  docker stop lort && docker rm lort")
+		p.Say("")
+	case o.ContainerExists:
+		p.Say("There's a stopped Lort container in the way. Remove it first (your data stays in the lort_data volume):")
+		p.Say("  docker rm lort")
 		p.Say("")
 	}
 	p.Say("All set! Start your board with:")

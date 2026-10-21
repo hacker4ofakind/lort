@@ -24,8 +24,10 @@ bad() {
 tools="bash sh uname awk df cat grep sed id head tr stat wc"
 case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*) windows=yes ;; *) windows=no ;; esac
 # Git Bash's tools need their DLLs next to them, and its /usr/bin has no git or docker.
-# System32 brings icacls, which setup.sh uses on Windows.
-if [ "$windows" = yes ]; then base=/usr/bin:/c/Windows/System32; else base=; fi
+# (setup.sh calls icacls by its full path; System32 stays off PATH because it can hold docker.)
+if [ "$windows" = yes ]; then base=/usr/bin; else base=; fi
+icacls="$(cygpath -u "${SYSTEMROOT:-C:\Windows}" 2>/dev/null)/System32/icacls.exe"
+export icacls
 mkbin() { # mkbin DIR [with-git]
 	mkdir -p "$1"
 	if [ "$windows" = no ]; then
@@ -59,15 +61,16 @@ info)
 	down) echo "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?" >&2; exit 1 ;;
 	denied) echo "permission denied while trying to connect to the Docker daemon socket" >&2; exit 1 ;;
 	esac ;;
-inspect) [ "${FAKE_RUNNING:-}" = yes ] && echo true; [ "${FAKE_RUNNING:-}" = yes ] || exit 1 ;;
+inspect)
+	if [ "${FAKE_RUNNING:-}" = yes ]; then echo true; elif [ "${FAKE_STOPPED:-}" = yes ]; then echo false; else exit 1; fi ;;
 port) [ "${FAKE_LORT_PORTS:-}" = yes ] && echo "0.0.0.0:$3"; exit 0 ;;
 build) exit "${FAKE_BUILD_CODE:-0}" ;;
 run)
 	if [ -e .env ]; then
 		case "$(uname -s)" in
 		MINGW* | MSYS* | CYGWIN*) # owner-only means one ACL entry, not inherited
-			acl=$(MSYS_NO_PATHCONV=1 icacls .env | grep -c ':(')
-			if [ "$acl" = 1 ] && ! MSYS_NO_PATHCONV=1 icacls .env | grep -q '(I)'; then perms=600; else perms=open; fi ;;
+			acl=$(MSYS_NO_PATHCONV=1 "$icacls" .env | grep -c ':(')
+			if [ "$acl" = 1 ] && ! MSYS_NO_PATHCONV=1 "$icacls" .env | grep -q '(I)'; then perms=600; else perms=open; fi ;;
 		*) perms=$(stat -c %a .env 2>/dev/null || stat -f %Lp .env) ;;
 		esac
 		echo "env-at-wizard size=$(wc -c <.env | tr -d ' ') perms=$perms" >>"$log"
@@ -115,7 +118,7 @@ if [ "$code" = 1 ] && has "git" && has "https://git-scm.com/downloads" && has "I
 scenario with-git with-docker
 if [ "$code" = 0 ] && called "docker|build|-t|lort|--build-arg|LORT_VERSION=dev|."; then ok "build without a tag uses LORT_VERSION=dev"; else bad "build call ($code): $out $(cat "$log")"; fi
 want="docker|run|--rm|-i|--entrypoint|lort|--cap-drop=ALL|--cap-add=CHOWN|--cap-add=SETUID|--cap-add=SETGID|--cap-add=DAC_OVERRIDE|--cap-add=FOWNER|--security-opt|no-new-privileges|-v|"
-if grep -F -- "$want" "$log" | grep -qF -- ":/work|-v|lort_data:/data|lort|setup|--workdir|/work|--ports-free=yes|--container-running=no|--os="; then ok "wizard call: mounts, entrypoint, flags"; else bad "wizard call: $(cat "$log")"; fi
+if grep -F -- "$want" "$log" | grep -qF -- ":/work|-v|lort_data:/data|lort|setup|--workdir|/work|--ports-free=yes|--container-running=no|--container-exists=no|--os="; then ok "wizard call: mounts, entrypoint, flags"; else bad "wizard call: $(cat "$log")"; fi
 if grep -q "env-at-wizard size=0 perms=600" "$log"; then ok ".env is empty and owner-only before the wizard"; else bad ".env before wizard: $(cat "$log")"; fi
 if called "docker|image|prune|-f|--filter|label=dev.lort.image=1"; then ok "prunes only old Lort images"; else bad "prune: $(cat "$log")"; fi
 
@@ -126,7 +129,7 @@ LORT_TEST_LISTENING="80" scenario with-git with-docker
 if called "--ports-free=no"; then ok "a taken port gives --ports-free=no"; else bad "taken: $(cat "$log")"; fi
 
 LORT_TEST_LISTENING="80 443" FAKE_LORT_PORTS=yes FAKE_RUNNING=yes scenario with-git with-docker
-if called "--ports-free=yes" && called "--container-running=yes"; then ok "ports held by the lort container count as free"; else bad "held by lort: $(cat "$log")"; fi
+if called "--ports-free=yes" && called "--container-running=yes|--container-exists=yes"; then ok "ports held by the lort container count as free"; else bad "held by lort: $(cat "$log")"; fi
 
 # A re-run never empties an existing .env.
 n=$((n + 1))
@@ -138,6 +141,9 @@ cp "$root/setup.sh" "$dir/work/"
 printf 'LORT_ENCRYPTION_KEY=abcdefghijklmnopqrstuvwxyz012345\n' >"$dir/work/.env"
 (cd "$dir/work" && FAKE_LOG="$dir/log" PATH="$dir/bin${base:+:$base}" bash ./setup.sh </dev/null >/dev/null 2>&1)
 if grep -q "abcdefghijklmnopqrstuvwxyz012345" "$dir/work/.env"; then ok "an existing .env keeps its key"; else bad "the key was wiped"; fi
+
+FAKE_STOPPED=yes scenario with-git with-docker
+if called "--container-running=no|--container-exists=yes"; then ok "a stopped lort container is reported as existing"; else bad "stopped: $(cat "$log")"; fi
 
 FAKE_BUILD_CODE=137 scenario with-git with-docker
 if [ "$code" = 1 ] && has "ran out of memory" && has "swapfile" && ! called "docker|run"; then ok "exit 137 is explained as out of memory"; else bad "137 ($code): $out"; fi

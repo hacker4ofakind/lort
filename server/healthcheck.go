@@ -27,18 +27,29 @@ func healthcheck([]string) int {
 		base = "https://127.0.0.1:443"
 		client.Transport = &http.Transport{TLSClientConfig: &tls.Config{ServerName: host, InsecureSkipVerify: true}} //nolint:gosec // see above
 	}
+	if err := checkHealth(client, base); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
+}
+
+// checkHealth fetches the health endpoint and one page from base.
+func checkHealth(client *http.Client, base string) error {
 	for _, path := range []string{"/api/lort/health", "/feedback"} {
 		res, err := client.Get(base + path)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
-			return 1
+			return fmt.Errorf("%s: %w", path, err)
 		}
-		_, _ = io.Copy(io.Discard, res.Body)
+		// A page that starts but never finishes is as broken as one that never starts.
+		_, err = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
+		if err != nil {
+			return fmt.Errorf("%s: reading the page: %w", path, err)
+		}
 		if res.StatusCode != http.StatusOK {
-			fmt.Fprintf(os.Stderr, "%s: %s\n", path, res.Status)
-			return 1
+			return fmt.Errorf("%s: %s", path, res.Status)
 		}
 	}
-	return 0
+	return nil
 }

@@ -60,6 +60,7 @@ type Options struct {
 	DataDir          string // PocketBase's data folder in the lort_data volume
 	PortsFree        bool   // 80 and 443 are free (or held by the lort container)
 	ContainerRunning bool   // a container named lort is running
+	ContainerExists  bool   // a container named lort exists, running or stopped
 	OS               string // linux, mac or windows
 	Script           string // the script the owner ran, named in advice; "" picks one from OS
 }

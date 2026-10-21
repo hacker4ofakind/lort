@@ -19,20 +19,30 @@ switch ($args[0]) {
         if ($env:FAKE_INFO -eq 'down') { [Console]::Error.WriteLine('Cannot connect to the Docker daemon. Is the docker daemon running?'); exit 1 }
         if ($env:FAKE_INFO -eq 'denied') { [Console]::Error.WriteLine('permission denied while trying to connect to the Docker daemon socket'); exit 1 }
     }
-    'inspect' { if ($env:FAKE_RUNNING) { 'true'; exit 0 } else { exit 1 } }
+    'inspect' {
+        if ($env:FAKE_RUNNING) { 'true'; exit 0 }
+        if ($env:FAKE_STOPPED) { 'false'; exit 0 }
+        exit 1
+    }
     'port' { if ($env:FAKE_LORT_PORTS) { "0.0.0.0:$($args[2])" } }
     'build' { if ($env:FAKE_BUILD_CODE) { exit [int] $env:FAKE_BUILD_CODE } }
     'run' {
         $envFile = Join-Path (Get-Location).Path '.env'
         if (Test-Path -LiteralPath $envFile) {
-            $private = if ($IsWindows) {
+            if ($IsWindows) {
+                # Compare SIDs, not names: account names come in more than one spelling.
                 $acl = Get-Acl -LiteralPath $envFile
-                $acl.AreAccessRulesProtected -and @($acl.Access).Count -eq 1 -and
-                    $acl.Access[0].IdentityReference.Value -eq [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+                $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+                $sids = @($acl.Access | ForEach-Object { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value })
+                $private = $acl.AreAccessRulesProtected -and $sids.Count -eq 1 -and $sids[0] -eq $me.Value
+                $detail = "protected=$($acl.AreAccessRulesProtected) aces=$(@($acl.Access | ForEach-Object { "$($_.IdentityReference):$($_.FileSystemRights)" }) -join ',') me=$($me.Value)"
             } else {
-                (Get-Item -Force -LiteralPath $envFile).UnixFileMode -eq ([System.IO.UnixFileMode] 'UserRead, UserWrite')
+                $mode = (Get-Item -Force -LiteralPath $envFile).UnixFileMode
+                $private = $mode -eq ([System.IO.UnixFileMode] 'UserRead, UserWrite')
+                $detail = "mode=$mode"
             }
             Add-Content -LiteralPath $env:FAKE_LOG -Value "env-at-wizard size=$((Get-Item -Force -LiteralPath $envFile).Length) private=$private"
+            if (-not $private) { Add-Content -LiteralPath $env:FAKE_LOG -Value "env-acl $detail" }
         }
     }
 }
@@ -79,11 +89,14 @@ exit 0
         $null = New-Item -ItemType File -Path $log
 
         $saved = @{ PATH = $env:PATH }
-        foreach ($k in 'INFO', 'RUNNING', 'LORT_PORTS', 'BUILD_CODE', 'GIT_VERSION', 'LOG') { $saved["FAKE_$k"] = [Environment]::GetEnvironmentVariable("FAKE_$k") }
-        $env:PATH = (Join-Path $dir 'bin') + $(if ($IsWindows) { ";$env:SystemRoot\System32" } else { '' })
+        foreach ($k in 'INFO', 'RUNNING', 'STOPPED', 'LORT_PORTS', 'BUILD_CODE', 'GIT_VERSION', 'LOG') { $saved["FAKE_$k"] = [Environment]::GetEnvironmentVariable("FAKE_$k") }
+        # Only the fakes: System32 can hold a real docker.exe (it does on GitHub's Windows runners),
+        # and setup.ps1 calls icacls by its full path.
+        $env:PATH = Join-Path $dir 'bin'
         $env:FAKE_LOG = $log
         $env:FAKE_INFO = $Fake['Info']
         $env:FAKE_RUNNING = $(if ($Fake['Running']) { '1' })
+        $env:FAKE_STOPPED = $(if ($Fake['Stopped']) { '1' })
         $env:FAKE_LORT_PORTS = $(if ($Fake['LortPorts']) { '1' })
         $env:FAKE_BUILD_CODE = $Fake['BuildCode']
         $env:FAKE_GIT_VERSION = $Fake['GitVersion']
@@ -146,11 +159,12 @@ Describe 'setup.ps1' {
         It 'runs the wizard with the exact mounts, entrypoint and flags' {
             $wizard = @($script:Run.Calls | Where-Object { $_ -like 'docker|run|*' })
             $wizard.Count | Should -Be 1
-            $wizard[0] | Should -BeLike 'docker|run|--rm|-i|--entrypoint|lort|--cap-drop=ALL|--cap-add=CHOWN|--cap-add=SETUID|--cap-add=SETGID|--cap-add=DAC_OVERRIDE|--cap-add=FOWNER|--security-opt|no-new-privileges|-v|*:/work|-v|lort_data:/data|lort|setup|--workdir|/work|--ports-free=yes|--container-running=no|--os=*'
+            $wizard[0] | Should -BeLike 'docker|run|--rm|-i|--entrypoint|lort|--cap-drop=ALL|--cap-add=CHOWN|--cap-add=SETUID|--cap-add=SETGID|--cap-add=DAC_OVERRIDE|--cap-add=FOWNER|--security-opt|no-new-privileges|-v|*:/work|-v|lort_data:/data|lort|setup|--workdir|/work|--ports-free=yes|--container-running=no|--container-exists=no|--os=*'
         }
 
         It 'makes .env empty and owner-only before the wizard runs' {
-            $script:Run.Calls | Should -Contain 'env-at-wizard size=0 private=True'
+            $seen = @($script:Run.Calls | Where-Object { $_ -like 'env-a*' }) -join ' / '
+            $seen | Should -Be 'env-at-wizard size=0 private=True'
         }
 
         It 'prunes only old Lort images' {
@@ -177,7 +191,12 @@ Describe 'setup.ps1' {
     It 'counts ports held by the lort container as free' {
         $env:LORT_TEST_LISTENING = '80 443'
         try { $r = Invoke-Setup -Fake @{ LortPorts = $true; Running = $true } } finally { $env:LORT_TEST_LISTENING = 'none' }
-        ($r.Calls -join "`n") | Should -Match '--ports-free=yes\|--container-running=yes'
+        ($r.Calls -join "`n") | Should -Match '--ports-free=yes\|--container-running=yes\|--container-exists=yes'
+    }
+
+    It 'reports a stopped lort container as existing but not running' {
+        $r = Invoke-Setup -Fake @{ Stopped = $true }
+        ($r.Calls -join "`n") | Should -Match '--container-running=no\|--container-exists=yes'
     }
 
     It 'explains exit code 137 as running out of memory' {

@@ -137,14 +137,21 @@ func (a AppAdmin) Create(_ context.Context, _, email, password string) error {
 }
 
 func (a AppAdmin) find(email string) (*core.Record, error) {
-	if email == core.DefaultInstallerEmail {
+	if strings.EqualFold(email, core.DefaultInstallerEmail) {
 		return nil, ErrNoSuchAdmin
 	}
-	r, err := a.App.FindFirstRecordByFilter(core.CollectionNameSuperusers, "email = {:email}", dbx.Params{"email": email})
-	if err != nil {
+	// PocketBase's own lookup first (it honours a NOCASE email index where one exists).
+	if r, err := a.App.FindAuthRecordByEmail(core.CollectionNameSuperusers, email); err == nil {
+		return r, nil
+	}
+	// The superusers' index is case-sensitive, so an owner who types their email in another
+	// case still means their admin: accept it when exactly one admin matches.
+	rs, err := a.App.FindRecordsByFilter(core.CollectionNameSuperusers, "email:lower = {:email}", "", 2, 0,
+		dbx.Params{"email": strings.ToLower(email)})
+	if err != nil || len(rs) != 1 {
 		return nil, ErrNoSuchAdmin
 	}
-	return r, nil
+	return rs[0], nil
 }
 
 func (a AppAdmin) Exists(_ context.Context, email string) (bool, error) {

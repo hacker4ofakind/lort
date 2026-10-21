@@ -353,3 +353,24 @@ func TestAdviceNamesTheScriptTheOwnerRan(t *testing.T) {
 		t.Errorf("default for Windows: %v", err)
 	}
 }
+
+func TestStoppedContainerMustBeRemovedFirst(t *testing.T) {
+	f := newFixture(t, answers("", ""))
+	f.setEnv("LORT_URL=http://localhost:4052\nLORT_TLS=off\nLORT_ENCRYPTION_KEY=abcdefghijklmnopqrstuvwxyz012345\n")
+	f.makeData()
+	f.admin.state = AdminExists
+	f.opts.ContainerExists = true // stopped: the name lort is still taken
+	if err := f.run(); err != nil {
+		t.Fatal(err)
+	}
+	out := f.prompt.out.String()
+	if !strings.Contains(out, "docker rm lort") || strings.Contains(out, "docker stop lort") {
+		t.Errorf("want the removal line for a stopped container:\n%s", out)
+	}
+	if !strings.Contains(out, "already has an admin") {
+		t.Error("a stopped container's database can be checked")
+	}
+	if strings.Index(out, "docker rm lort") > strings.Index(out, proxyLine) {
+		t.Error("the removal line should come before the run line")
+	}
+}

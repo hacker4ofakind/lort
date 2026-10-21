@@ -151,6 +151,14 @@ check "gives the volume back to uid 10001" test "$(uid_of "$id-one" /data/pb_dat
 check "the top of the volume too" test "$(uid_of "$id-one" /data)" = 10001
 docker stop "$id-one" >/dev/null
 
+# 2b. Only one restored subtree belongs to root; everything the entrypoint used to probe is fine.
+docker run --rm --entrypoint sh -u 0 -v "$id-one:/data" "$image" -c 	'mkdir -p /data/pb_data/storage/restored && echo x >/data/pb_data/storage/restored/pic.png && ln -sf /etc/hostname /data/pb_data/storage/link && chown -R 0:0 /data/pb_data/storage'
+docker start "$id-one" >/dev/null
+check "starts with a root-owned subtree inside" wait_healthy "$port"
+check "gives the nested files back to uid 10001" test "$(uid_of "$id-one" /data/pb_data/storage/restored/pic.png)" = 10001
+check "without following a symlink out of the volume" test "$(docker exec "$id-one" stat -c %u /etc/hostname)" = 0
+docker stop "$id-one" >/dev/null
+
 # 3. A different key on that data says so once and plainly.
 env_wrong=$(envfile wrong LORT_URL=http://localhost:4052 LORT_TLS=off "LORT_ENCRYPTION_KEY=$(key)")
 out=$(docker run --rm -v "$id-one:/data" --env-file "$env_wrong" "$image" 2>&1) && code=0 || code=$?

@@ -3,7 +3,6 @@
 package setup
 
 import (
-	"errors"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -30,37 +29,28 @@ func chownLike(path, ref string) error {
 	return os.Lchown(path, int(st.Uid), int(st.Gid))
 }
 
-// ownData does what the image's entrypoint does at every boot: give the data volume to the
-// lort user when its top level or the database belongs to someone else.
+// ownData does what the image's entrypoint does at every boot: give everything in the data
+// volume to the lort user, including a subtree a restore left to root. It never follows a
+// symlink: links are re-owned themselves, their targets are left alone.
 func ownData(dataDir string) error {
 	if os.Geteuid() != 0 {
 		return nil
 	}
-	root := filepath.Dir(dataDir)
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return err
 	}
-	wrong := false
-	for _, p := range []string{root, dataDir, filepath.Join(dataDir, "data.db")} {
-		fi, err := os.Lstat(p)
-		if errors.Is(err, fs.ErrNotExist) {
-			continue
-		}
+	return filepath.WalkDir(filepath.Dir(dataDir), func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if st, ok := fi.Sys().(*syscall.Stat_t); ok && st.Uid != lortUID {
-			wrong = true
+		fi, err := d.Info() // Lstat: WalkDir doesn't follow links
+		if err != nil {
+			return err
 		}
-	}
-	if !wrong {
+		if st, ok := fi.Sys().(*syscall.Stat_t); ok && (st.Uid != lortUID || st.Gid != lortUID) {
+			return os.Lchown(p, lortUID, lortUID)
+		}
 		return nil
-	}
-	return filepath.WalkDir(root, func(p string, _ fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		return os.Lchown(p, lortUID, lortUID)
 	})
 }
 
