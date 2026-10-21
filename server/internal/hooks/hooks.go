@@ -4,16 +4,19 @@ package hooks
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/hacker4ofakind/lort/server/internal/requests"
+	"github.com/hacker4ofakind/lort/server/internal/status"
 	"github.com/hacker4ofakind/lort/server/internal/team"
 )
 
 // Register binds every hook to app.
 func Register(app core.App, svc *requests.Service) {
+	requests.BindStatusTime(app)
 	app.OnRecordCreateRequest("users").BindFunc(onUserCreate)
 	app.OnRecordCreateRequest("requests").BindFunc(func(e *core.RecordRequestEvent) error {
 		return onRequestCreate(e, svc)
@@ -123,12 +126,29 @@ func onRequestCreate(e *core.RecordRequestEvent, svc *requests.Service) error {
 		return e.ForbiddenError("Only the team can post for someone else.", nil)
 	}
 
+	// roadmapStatus lets the team add a request straight to Planned or In progress.
+	var onRoadmap status.Status
+	if raw, sent := info.Body["roadmapStatus"]; sent && raw != nil {
+		if !author.GetBool("isAdmin") {
+			return e.ForbiddenError("Only the team can put a request on the roadmap.", nil)
+		}
+		v, _ := raw.(string)
+		if v != string(status.Planned) && v != string(status.Progress) {
+			return e.BadRequestError("Pick Planned or In progress.", nil)
+		}
+		onRoadmap = status.Status(v)
+	}
+
 	r := e.Record
 	r.Set("author", author.Id)
 	r.Set("status", "pending")
+	if onRoadmap != "" {
+		r.Set("status", string(onRoadmap))
+	}
 	r.Set("mergedInto", "")
 	r.Set("upvoteCount", 0)
 	r.Set("teamSeenAt", nil)
+	r.Set("statusChangedAt", time.Now()) // never the client's value
 	switch {
 	case author.GetBool("isAdmin") && internal:
 		r.Set("visible", false)
@@ -160,7 +180,14 @@ func onRequestCreate(e *core.RecordRequestEvent, svc *requests.Service) error {
 		if err := e.Next(); err != nil {
 			return err
 		}
-		return svc.AfterCreate(tx, r, author)
+		if err := svc.AfterCreate(tx, r, author); err != nil {
+			return err
+		}
+		if onRoadmap != "" {
+			// The team member put it there, even when someone else is the author.
+			return svc.LogJoinedRoadmap(tx, r, e.Auth, onRoadmap)
+		}
+		return nil
 	})
 }
 

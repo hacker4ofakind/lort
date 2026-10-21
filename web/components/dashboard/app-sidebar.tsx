@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { IconAdjustments, IconInbox, IconLayoutSidebarLeftCollapse } from "@tabler/icons-react"
+import { IconAdjustments, IconInbox, IconLayoutKanban, IconLayoutSidebarLeftCollapse } from "@tabler/icons-react"
 import { useConfig } from "@/app/providers"
 import { signOutAdmin } from "@/components/dashboard/session"
 import { LogoMark } from "@/components/lort/logo-mark"
@@ -31,8 +31,11 @@ import { useUser } from "@/lib/auth"
 import { pbAdmin } from "@/lib/pocketbase"
 import { keys } from "@/lib/query"
 
-// Roadmap and Changelog join this list in Phase 2, Docs in Phase 6.
-const TOP = [{ href: "/dashboard/requests", label: "Requests", icon: IconInbox }]
+// Changelog joins this list in Phase 2B, Docs in Phase 6.
+const TOP = [
+  { href: "/dashboard/requests", label: "Requests", icon: IconInbox },
+  { href: "/dashboard/roadmap", label: "Roadmap", icon: IconLayoutKanban },
+]
 const BOTTOM = [{ href: "/dashboard/settings", label: "Settings", icon: IconAdjustments }]
 
 /** The dashboard sidebar: 244px, collapsing to a 76px rail (remembered in a cookie); a sheet on phones. */
@@ -66,7 +69,9 @@ export function AppSidebar() {
         </Button>
       </SidebarHeader>
       <SidebarContent className="px-3">
-        <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">{TOP.map((i) => item(i, counts.data?.new))}</SidebarMenu>
+        <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">
+          {TOP.map((i) => item(i, i.label === "Requests" ? counts.data?.new : undefined))}
+        </SidebarMenu>
         <div className="flex-1" />
         <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">{BOTTOM.map((i) => item(i))}</SidebarMenu>
       </SidebarContent>

@@ -18,6 +18,7 @@ const item = (over: Partial<RequestItem> = {}): RequestItem => ({
   awaitingApproval: true,
   new: false,
   created: "2026-10-14T10:00:00Z",
+  statusChangedAt: "2026-10-14T10:00:00Z",
   ...over,
 })
 
@@ -33,6 +34,6 @@ describe("RequestCard", () => {
   it("can't take votes once closed", () => {
     render(<RequestCard request={item({ status: "closed", awaitingApproval: false })} onVote={vi.fn()} />)
     expect(screen.queryByRole("button", { name: /upvote/i })).toBeNull()
-    expect(screen.getByLabelText("1 vote")).toBeInTheDocument()
+    expect(screen.getByLabelText("1 vote, including yours")).toBeInTheDocument()
   })
 })

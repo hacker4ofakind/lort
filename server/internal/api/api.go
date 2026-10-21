@@ -34,10 +34,13 @@ func Register(se *core.ServeEvent, d Deps) {
 	g.GET("/requests", d.list)
 	g.GET("/requests/{id}", d.detail)
 	g.GET("/similar", d.similar)
+	g.GET("/roadmap", d.roadmap)
+	g.GET("/roadmap/shipped", d.shipped)
 	g.POST("/requests/{id}/vote", d.vote).Bind(apis.RequireAuth("users"))
 
 	team := g.Group("").Bind(apis.RequireSuperuserAuth())
 	team.POST("/requests/{id}/status", d.setStatus)
+	team.POST("/requests/{id}/roadmap", d.moveOnRoadmap)
 	team.POST("/requests/{id}/undo", d.undo)
 	team.POST("/requests/{id}/merge", d.merge)
 	team.POST("/requests/{id}/seen", d.seen)
@@ -61,6 +64,8 @@ func fail(e *core.RequestEvent, err error) error {
 	switch {
 	case errors.Is(err, requests.ErrNotFound):
 		return e.NotFoundError("That request is gone.", nil)
+	case errors.Is(err, requests.ErrMoved):
+		return e.Error(http.StatusConflict, err.Error(), nil)
 	case errors.Is(err, requests.ErrNotVoting), errors.Is(err, requests.ErrUndoGone),
 		errors.Is(err, requests.ErrBadMerge), errors.Is(err, team.ErrRemoveSelf), errors.Is(err, team.ErrLastAdmin):
 		return e.BadRequestError(err.Error(), nil)
@@ -144,6 +149,84 @@ func (d Deps) setStatus(e *core.RequestEvent) error {
 		return err
 	}
 	ch, err := d.Svc.SetStatus(e.Request.PathValue("id"), body.Action, who)
+	if err != nil {
+		return fail(e, err)
+	}
+	return e.JSON(http.StatusOK, ch)
+}
+
+// publicFeature answers 404 with msg when an optional public page is switched off. The team
+// still gets through, so the dashboard keeps working while the public page is hidden. One
+// helper for every such page: the roadmap now, the changelog later.
+func publicFeature(e *core.RequestEvent, on bool, msg string) error {
+	if on || e.HasSuperuserAuth() {
+		return nil
+	}
+	return e.NotFoundError(msg, nil)
+}
+
+// noStore keeps shared caches from serving one caller's roadmap (votes, hidden cards) to another.
+func noStore(e *core.RequestEvent) {
+	h := e.Response.Header()
+	h.Set("Cache-Control", "private, no-store")
+	h.Add("Vary", "Authorization")
+}
+
+func (d Deps) roadmap(e *core.RequestEvent) error {
+	cfg, err := d.Site.Get()
+	if err != nil {
+		return err
+	}
+	if err := publicFeature(e, cfg.RoadmapPublic, "There's no public roadmap yet."); err != nil {
+		return err
+	}
+	// team comes from the superuser token alone, never from a query parameter or a profile flag.
+	who, team, err := viewer(e)
+	if err != nil {
+		return err
+	}
+	rm, err := d.Svc.Roadmap(who, team)
+	if err != nil {
+		return err
+	}
+	noStore(e)
+	return e.JSON(http.StatusOK, rm)
+}
+
+func (d Deps) shipped(e *core.RequestEvent) error {
+	cfg, err := d.Site.Get()
+	if err != nil {
+		return err
+	}
+	if err := publicFeature(e, cfg.RoadmapPublic, "There's no public roadmap yet."); err != nil {
+		return err
+	}
+	who, team, err := viewer(e)
+	if err != nil {
+		return err
+	}
+	page, _ := strconv.Atoi(e.Request.URL.Query().Get("page"))
+	res, err := d.Svc.Shipped(page, who, team)
+	if err != nil {
+		return err
+	}
+	noStore(e)
+	return e.JSON(http.StatusOK, res)
+}
+
+func (d Deps) moveOnRoadmap(e *core.RequestEvent) error {
+	var body struct {
+		From status.Status `json:"from"`
+		To   status.Status `json:"to"`
+	}
+	if err := e.BindBody(&body); err != nil || !status.OnRoadmap(body.To) {
+		return e.BadRequestError("Pick Planned, In progress or Completed.", err)
+	}
+	who, err := actor(e)
+	if err != nil {
+		return err
+	}
+	ch, err := d.Svc.MoveOnRoadmap(e.Request.PathValue("id"), body.From, body.To, who)
 	if err != nil {
 		return fail(e, err)
 	}

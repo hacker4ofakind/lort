@@ -22,3 +22,8 @@ export function isAbort(err: unknown): boolean {
 export function isAuthError(err: unknown): boolean {
   return err instanceof ClientResponseError && (err.status === 401 || err.status === 403)
 }
+
+/** True when the server says the thing isn't there (the public roadmap switched off, a deleted request). */
+export function isNotFound(err: unknown): boolean {
+  return err instanceof ClientResponseError && err.status === 404
+}

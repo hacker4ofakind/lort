@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { expectAccessible, seedRequest, signInAdmin, unique } from "./helpers"
+import { expectAccessible, seedRequest, seedRoadmapRequest, setRoadmapPublic, signInAdmin, unique } from "./helpers"
 
 // axe on every 1B page, in both themes (the projects in playwright.config.ts).
 
@@ -32,4 +32,45 @@ test("dashboard pages", async ({ page, request }) => {
   await page.goto("/dashboard/settings")
   await expect(page.getByLabel("App name")).toBeVisible()
   await expectAccessible(page)
+})
+
+test("the public roadmap and the shipped list", async ({ page, request }) => {
+  const u = unique()
+  await seedRoadmapRequest(request, `Planned accessible ${u}`, "planned")
+  await seedRoadmapRequest(request, `Building accessible ${u}`, "progress")
+  await seedRoadmapRequest(request, `Shipped accessible ${u}`, "completed")
+  await page.goto("/roadmap")
+  await expect(page.getByRole("link", { name: `Planned accessible ${u}` })).toBeVisible()
+  await expectAccessible(page)
+  await page.goto("/roadmap/shipped")
+  await expect(page.getByRole("link", { name: `Shipped accessible ${u}` })).toBeVisible()
+  await expectAccessible(page)
+})
+
+test("the roadmap's off message", async ({ page, request }) => {
+  await setRoadmapPublic(request, false)
+  try {
+    await page.goto("/roadmap")
+    await expect(page.getByText("No public roadmap yet")).toBeVisible()
+    await expectAccessible(page)
+  } finally {
+    await setRoadmapPublic(request, true)
+  }
+})
+
+test("the dashboard roadmap, and its card being lifted", async ({ page, request }) => {
+  const title = `Dashboard accessible ${unique()}`
+  await seedRoadmapRequest(request, title, "planned")
+  await signInAdmin(page)
+  await page.goto("/dashboard/roadmap")
+  await expect(page.getByRole("button", { name: title, exact: true })).toBeVisible()
+  await expectAccessible(page)
+
+  // Mid-drag: the lifted card, the dashed slot and the lit-up column.
+  await page.getByRole("button", { name: title, exact: true }).focus()
+  await page.keyboard.press("Space")
+  await page.keyboard.press("ArrowRight")
+  await expect(page.locator("[id^=DndLiveRegion]")).toContainText("is over In progress.")
+  await expectAccessible(page)
+  await page.keyboard.press("Escape")
 })

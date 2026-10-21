@@ -21,3 +21,17 @@ export function relativeTime(iso: string, now = new Date()): string {
   if (d < 7) return `${d} days ago`
   return shortDate(iso, now)
 }
+
+/**
+ * Like relativeTime, but rounder for things that happened a while ago: under a week it is
+ * relativeTime, then "last week", "3 weeks ago", "last month", "4 months ago", "over a year ago".
+ */
+export function agoText(iso: string, now = new Date()): string {
+  const days = Math.floor(Math.max(0, now.getTime() - new Date(iso).getTime()) / 86_400_000)
+  if (days < 7) return relativeTime(iso, now)
+  if (days < 14) return "last week"
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`
+  if (days < 60) return "last month"
+  if (days < 365) return `${Math.floor(days / 30)} months ago`
+  return "over a year ago"
+}

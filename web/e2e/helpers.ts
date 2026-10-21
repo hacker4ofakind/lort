@@ -77,3 +77,67 @@ export async function expectAccessible(page: Page) {
       for (const n of v.nodes) console.log(`[axe] ${page.url()} ${v.id}\n${n.html}\n${n.failureSummary}\n`)
   expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([])
 }
+
+/** The admin's board profile token (a users record with isAdmin), for acting as the team on the record API. */
+export async function teamToken(request: APIRequestContext): Promise<string> {
+  const res = await request.get(`${API}/api/lort/team/me`, { headers: { Authorization: await adminToken(request) } })
+  expect(res.ok()).toBeTruthy()
+  return (await res.json()).token
+}
+
+/** Applies triage actions to a request as the team. */
+export async function triage(request: APIRequestContext, id: string, ...actions: string[]) {
+  const token = await adminToken(request)
+  for (const action of actions) {
+    const res = await request.post(`${API}/api/lort/requests/${id}/status`, { headers: { Authorization: token }, data: { action } })
+    expect(res.ok(), `${action}: ${await res.text()}`).toBeTruthy()
+  }
+}
+
+const TO_ROADMAP = {
+  planned: ["accept", "roadmap"],
+  progress: ["accept", "roadmap", "start"],
+  completed: ["accept", "roadmap", "start", "complete"],
+}
+
+/** Moves a pending request onto the roadmap, as the triage bar would. */
+export async function putOnRoadmap(request: APIRequestContext, id: string, to: keyof typeof TO_ROADMAP) {
+  await triage(request, id, ...TO_ROADMAP[to])
+}
+
+/** A seeded request that is already in a roadmap column. */
+export async function seedRoadmapRequest(request: APIRequestContext, title: string, to: keyof typeof TO_ROADMAP, board?: string) {
+  const seeded = await seedRequest(request, title, board)
+  await putOnRoadmap(request, seeded.id, to)
+  return seeded
+}
+
+/** An internal (hidden) request the team created straight into a roadmap column. */
+export async function seedHiddenRoadmapRequest(request: APIRequestContext, title: string, to: "planned" | "progress") {
+  const res = await request.post(`${API}/api/collections/requests/records`, {
+    headers: { Authorization: await teamToken(request) },
+    data: { board: (await boardIds(request)).features, title, internal: true, roadmapStatus: to },
+  })
+  expect(res.ok(), await res.text()).toBeTruthy()
+  return (await res.json()).id as string
+}
+
+/** Sets roadmapPublic straight through the API, to put things back after a test that flipped it. */
+export async function setRoadmapPublic(request: APIRequestContext, on: boolean) {
+  const token = await adminToken(request)
+  const list = await (await request.get(`${API}/api/collections/settings/records`, { headers: { Authorization: token } })).json()
+  const res = await request.patch(`${API}/api/collections/settings/records/${list.items[0].id}`, {
+    headers: { Authorization: token },
+    data: { roadmapPublic: on },
+  })
+  expect(res.ok()).toBeTruthy()
+}
+
+/** A roadmap move made by "a teammate", straight through the API. */
+export async function moveViaApi(request: APIRequestContext, id: string, from: string, to: string) {
+  const res = await request.post(`${API}/api/lort/requests/${id}/roadmap`, {
+    headers: { Authorization: await adminToken(request) },
+    data: { from, to },
+  })
+  expect(res.ok(), await res.text()).toBeTruthy()
+}

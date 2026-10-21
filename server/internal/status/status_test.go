@@ -56,3 +56,25 @@ func TestRoadmapChange(t *testing.T) {
 		t.Errorf("closed→pending = %q", got)
 	}
 }
+
+func TestRoadmapMove(t *testing.T) {
+	cols := []Status{Planned, Progress, Completed}
+	for _, from := range cols {
+		for _, to := range cols {
+			err := RoadmapMove(from, to)
+			if from == to && err == nil {
+				t.Errorf("%s → %s should be refused", from, to)
+			}
+			if from != to && err != nil {
+				t.Errorf("%s → %s = %v", from, to, err)
+			}
+		}
+	}
+	for _, c := range []struct{ from, to Status }{
+		{Reviewing, Planned}, {Planned, Reviewing}, {Closed, Completed}, {Progress, Pending}, {Planned, "bogus"},
+	} {
+		if err := RoadmapMove(c.from, c.to); err == nil {
+			t.Errorf("%s → %s should be refused", c.from, c.to)
+		}
+	}
+}

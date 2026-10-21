@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { signInAdmin, unique } from "./helpers"
+import { setRoadmapPublic, signInAdmin, unique } from "./helpers"
 
 test.beforeEach(async ({ page }) => {
   await signInAdmin(page)
@@ -111,4 +111,39 @@ test("the table of contents follows the section you're on", async ({ page }) => 
   await expect(current).toHaveText("Team")
   await page.mouse.wheel(0, -10_000)
   await expect(current).toHaveText("Branding")
+})
+
+test("the roadmap can be switched off and on, and the pill and pages follow", async ({ page, request }) => {
+  const toggle = page.getByRole("switch", { name: "Show the roadmap publicly" })
+  const nav = page.getByRole("navigation", { name: "Board" })
+  try {
+    await toggle.click()
+    await expect(page.getByText("The roadmap is hidden from the board.")).toBeVisible()
+
+    await page.goto("/feedback")
+    await expect(nav.getByRole("link", { name: "Feedback" })).toBeVisible()
+    await expect(nav.getByRole("link", { name: "Roadmap" })).toHaveCount(0)
+    for (const path of ["/roadmap", "/roadmap/shipped"]) {
+      await page.goto(path)
+      await expect(page.getByText("No public roadmap yet")).toBeVisible()
+      await expect(page.getByText("The team hasn't shared its plans here.")).toBeVisible()
+    }
+    await page.getByRole("link", { name: "Go to the board" }).click()
+    await page.waitForURL(/\/feedback/)
+
+    // The team still sees every card in the dashboard, with a pointer to the setting.
+    await page.goto("/dashboard/roadmap")
+    await expect(page.getByText("The public roadmap is off.")).toBeVisible()
+    await page.getByRole("link", { name: "Turn it on in Settings." }).click()
+    await page.waitForURL(/\/dashboard\/settings#roadmap/)
+
+    await page.getByRole("switch", { name: "Show the roadmap publicly" }).click()
+    await expect(page.getByText("The roadmap is public.")).toBeVisible()
+    await page.goto("/feedback")
+    await expect(nav.getByRole("link", { name: "Roadmap" })).toBeVisible()
+    await page.goto("/roadmap")
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("What's coming to Driftnote?")
+  } finally {
+    await setRoadmapPublic(request, true)
+  }
 })

@@ -29,7 +29,7 @@ func Ensure(app core.App) error {
 	return app.RunInTransaction(func(tx core.App) error {
 		steps := []func(core.App) error{
 			ensureUsers, ensureSuperusers, ensureBoards, ensureTags, ensureRequests, ensureVotes,
-			ensureComments, ensureActivity, ensureSettings, ensureSearch, ensureRateLimits,
+			ensureComments, ensureActivity, backfillStatusTime, ensureSettings, ensureSearch, ensureRateLimits,
 		}
 		for _, step := range steps {
 			if err := step(tx); err != nil {
@@ -149,6 +149,8 @@ func ensureRequests(app core.App) error {
 		&core.NumberField{Name: "trendScore"},
 		&core.TextField{Name: "mergedInto", Max: 15},
 		&core.DateField{Name: "teamSeenAt"},
+		// When the request entered its current status. Hooks keep it; clients can't write it.
+		&core.DateField{Name: "statusChangedAt"},
 	)
 	protectImages(c)
 	c.ListRule = types.Pointer(publicRequest + " || " + mine)
@@ -160,10 +162,11 @@ func ensureRequests(app core.App) error {
 	c.CreateRule = types.Pointer("@request.auth.id != '' && @request.auth.collectionName = 'users'")
 	// Authors may edit their own request while it is still pending; triage happens in /api/lort.
 	// Moving it to another board is the team's call (boards decide visibility and approval).
-	c.UpdateRule = types.Pointer(mine + " && status = 'pending' && @request.body.board:isset = false && @request.body.status:isset = false && @request.body.visible:isset = false && @request.body.awaitingApproval:isset = false && @request.body.upvoteCount:isset = false && @request.body.trendScore:isset = false && @request.body.mergedInto:isset = false && @request.body.teamSeenAt:isset = false && @request.body.author:isset = false")
+	c.UpdateRule = types.Pointer(mine + " && status = 'pending' && @request.body.board:isset = false && @request.body.status:isset = false && @request.body.visible:isset = false && @request.body.awaitingApproval:isset = false && @request.body.upvoteCount:isset = false && @request.body.trendScore:isset = false && @request.body.mergedInto:isset = false && @request.body.teamSeenAt:isset = false && @request.body.statusChangedAt:isset = false && @request.body.author:isset = false")
 	c.DeleteRule = nil
 	c.AddIndex("idx_requests_board_status", false, "board, status", "")
 	c.AddIndex("idx_requests_trend", false, "trendScore", "")
+	c.AddIndex("idx_requests_status_time", false, "status, statusChangedAt", "")
 	return app.Save(c)
 }
 
@@ -219,7 +222,22 @@ func ensureActivity(app core.App) error {
 	)
 	c.ListRule = types.Pointer("request.visible = true && request.board.isPublic = true")
 	c.ViewRule = c.ListRule
+	c.AddIndex("idx_activity_request_created", false, "request, created", "")
 	return app.Save(c)
+}
+
+// backfillStatusTime fills statusChangedAt on requests that predate the field: the time of the
+// latest status change or merge, else the time the request was created. It runs after
+// ensureActivity (a fresh install has no activity table while requests are made) and does
+// nothing once every row has a value. Both columns use PocketBase's stored text format, so
+// MAX and comparisons order correctly.
+func backfillStatusTime(app core.App) error {
+	_, err := app.DB().NewQuery(`
+		UPDATE requests SET statusChangedAt = COALESCE(
+			(SELECT MAX(created) FROM activity WHERE request = requests.id AND kind IN ('status_changed', 'merged_in')),
+			created)
+		WHERE statusChangedAt = '' OR statusChangedAt IS NULL`).Execute()
+	return err
 }
 
 func ensureSettings(app core.App) error {

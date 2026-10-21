@@ -33,6 +33,8 @@ export interface NewRequest {
   website: string
   /** The team only: the email of the person this is posted for. */
   onBehalf?: string
+  /** The team only: put it straight into a roadmap column. */
+  roadmapStatus?: "planned" | "progress"
 }
 
 /**
@@ -51,6 +53,7 @@ export function newRequestPayload(v: NewRequest) {
     website: v.website,
     // The server makes this person the author, with their vote, in the same transaction.
     ...(v.onBehalf?.trim() ? { onBehalf: v.onBehalf.trim() } : {}),
+    ...(v.roadmapStatus ? { roadmapStatus: v.roadmapStatus } : {}),
   }
 }
 
@@ -63,17 +66,21 @@ export interface SuggestDialogProps {
   team?: boolean
   /** Boards to offer; the first is the default. */
   boards: Ref[]
+  /** The roadmap's "+": the request goes straight into this column and the page stays where it is. */
+  roadmapStatus?: "planned" | "progress"
+  /** Called with the new request's id once it is saved. */
+  onCreated?: (id: string) => void
 }
 
 /** "Suggest something": board, title with similar requests, tags and details. Signed-out visitors sign in here first. */
-export function SuggestDialog({ open, onOpenChange, team = false, boards }: SuggestDialogProps) {
+export function SuggestDialog({ open, onOpenChange, team = false, boards, roadmapStatus, onCreated }: SuggestDialogProps) {
   const user = useUser()
   const config = useConfig()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="top-[72px] max-h-[calc(100dvh-96px)] translate-y-0 overflow-y-auto px-[26px] pt-6 pb-5 sm:max-w-[640px]">
         {user || team ? (
-          <SuggestForm team={team} boards={boards} onDone={() => onOpenChange(false)} />
+          <SuggestForm team={team} boards={boards} roadmapStatus={roadmapStatus} onCreated={onCreated} onDone={() => onOpenChange(false)} />
         ) : (
           <>
             <DialogTitle className="sr-only">Suggest something</DialogTitle>
@@ -85,7 +92,21 @@ export function SuggestDialog({ open, onOpenChange, team = false, boards }: Sugg
   )
 }
 
-function SuggestForm({ team, boards, onDone }: { team: boolean; boards: Ref[]; onDone: () => void }) {
+const COLUMN_NAME = { planned: "Planned", progress: "In progress" } as const
+
+function SuggestForm({
+  team,
+  boards,
+  roadmapStatus,
+  onCreated,
+  onDone,
+}: {
+  team: boolean
+  boards: Ref[]
+  roadmapStatus?: "planned" | "progress"
+  onCreated?: (id: string) => void
+  onDone: () => void
+}) {
   const config = useConfig()
   const user = useUser()
   const router = useRouter()
@@ -118,12 +139,19 @@ function SuggestForm({ team, boards, onDone }: { team: boolean; boards: Ref[]; o
           internal: visibility === "internal",
           website,
           onBehalf: team ? onBehalf : undefined,
+          roadmapStatus: team ? roadmapStatus : undefined,
         })
       )
     await qc.invalidateQueries({ queryKey: ["requests"] })
     if (team) await qc.invalidateQueries({ queryKey: keys.stats })
-    toast(rec.awaitingApproval ? "Thanks! The team will look at it before it goes on the board." : "Posted. Thanks for the idea!")
     onDone()
+    if (roadmapStatus) {
+      // Added from the roadmap's "+": stay on the roadmap.
+      toast("Added to the roadmap")
+      onCreated?.(rec.id)
+      return
+    }
+    toast(rec.awaitingApproval ? "Thanks! The team will look at it before it goes on the board." : "Posted. Thanks for the idea!")
     router.push(team ? `/dashboard/requests/${rec.id}` : `/feedback/${rec.id}`)
   }
 
@@ -132,6 +160,9 @@ function SuggestForm({ team, boards, onDone }: { team: boolean; boards: Ref[]; o
       <DialogHeader>
         <DialogTitle>{team ? "New request" : "Suggest something"}</DialogTitle>
         <DialogDescription>{team ? "Add one yourself, or for someone who asked." : `Got an idea for ${config.appName}?`}</DialogDescription>
+        {team && roadmapStatus && (
+          <p className="text-label font-semibold text-ink-2">It goes straight into {COLUMN_NAME[roadmapStatus]}.</p>
+        )}
       </DialogHeader>
 
       {boards.length > 1 && (

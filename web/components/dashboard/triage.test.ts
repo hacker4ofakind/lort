@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { queueLabel } from "@/components/dashboard/team-request"
-import { changeMessage } from "@/components/dashboard/use-triage"
+import { changeMessage, completionToast, UNDO_SECONDS } from "@/components/dashboard/use-triage"
+import { undoToast } from "@/components/lort/undo-toast"
 import { OPEN_STATUSES } from "@/lib/status"
 
 describe("changeMessage", () => {
@@ -9,6 +10,29 @@ describe("changeMessage", () => {
     expect(changeMessage({ from: "planned", to: "reviewing", roadmap: "removed" })).toBe("Taken off the roadmap")
     expect(changeMessage({ from: "progress", to: "completed", roadmap: "" })).toBe("Marked as completed")
     expect(changeMessage({ from: "pending", to: "reviewing", roadmap: "" })).toBeNull()
+  })
+})
+
+vi.mock("@/components/lort/undo-toast", () => ({ undoToast: vi.fn() }))
+
+describe("completionToast", () => {
+  beforeEach(() => vi.mocked(undoToast).mockClear())
+  const done = { from: "progress", to: "completed", roadmap: "" } as const
+
+  it("says Marked as completed without a title, and names the request with one", () => {
+    const onUndo = vi.fn()
+    completionToast({ change: done, onUndo })
+    expect(undoToast).toHaveBeenLastCalledWith(expect.objectContaining({ message: "Marked as completed", seconds: UNDO_SECONDS, onUndo }))
+    completionToast({ title: "Dark mode", change: done, onUndo, id: "r1" })
+    expect(undoToast).toHaveBeenLastCalledWith(expect.objectContaining({ message: "Marked “Dark mode” as completed", id: "r1" }))
+  })
+
+  it("mentions the emails when they are on, and does nothing for other changes", () => {
+    completionToast({ change: done, onUndo: vi.fn(), email: true })
+    expect(undoToast).toHaveBeenLastCalledWith(expect.objectContaining({ message: "Marked as completed. People will hear about it in a minute." }))
+    vi.mocked(undoToast).mockClear()
+    completionToast({ change: { from: "completed", to: "progress", roadmap: "" }, onUndo: vi.fn() })
+    expect(undoToast).not.toHaveBeenCalled()
   })
 })
 

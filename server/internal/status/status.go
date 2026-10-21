@@ -74,3 +74,15 @@ func RoadmapChange(from, to Status) string {
 		return ""
 	}
 }
+
+// RoadmapMove checks a drag on the roadmap board: any roadmap column to any other. The triage
+// bar keeps its own, narrower table (Next); only the board moves freely.
+func RoadmapMove(from, to Status) error {
+	if !OnRoadmap(from) || !OnRoadmap(to) {
+		return fmt.Errorf("the roadmap only moves cards between Planned, In progress and Completed")
+	}
+	if from == to {
+		return fmt.Errorf("that card is already in %s", to)
+	}
+	return nil
+}

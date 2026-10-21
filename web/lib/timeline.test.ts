@@ -12,4 +12,11 @@ describe("buildTimeline", () => {
     })
     expect(t.map((e) => (e.type === "event" ? e.event.id : e.comment.id))).toEqual(["moved", "devon", "mara", "posted"])
   })
+
+  it("shows a status change above the post it followed when both share a time", () => {
+    const ev = (id: string, kind: string) => ({ id, kind, created: "2026-10-15T10:00:00.123Z" }) as TimelineEvent
+    // The server sends activity oldest first, so on a tie the later row is the newer one.
+    const t = buildTimeline({ activity: [ev("posted", "created"), ev("planned", "status_changed")], thread: [] })
+    expect(t.map((e) => (e.type === "event" ? e.event.id : e.comment.id))).toEqual(["planned", "posted"])
+  })
 })

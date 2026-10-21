@@ -41,7 +41,7 @@ export function VoteSticker({ count, voted, onToggle, size = "md", readOnly, sub
 
   if (readOnly) {
     return (
-      <span className={cn(classes, voted && "-rotate-7")} aria-label={votes}>
+      <span className={cn(classes, voted && "-rotate-7")} aria-label={voted ? `${votes}, including yours` : votes}>
         {count}
       </span>
     )

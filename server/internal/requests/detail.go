@@ -157,7 +157,7 @@ func (s *Service) thread(requestID string, team bool) ([]Comment, error) {
 
 // activity returns the request's timeline entries oldest first.
 func (s *Service) activity(requestID string, viewer *core.Record, team bool) ([]Event, error) {
-	recs, err := s.App.FindRecordsByFilter("activity", "request = {:r}", "created", 0, 0, dbx.Params{"r": requestID})
+	recs, err := s.App.FindRecordsByFilter("activity", "request = {:r}", "created,@rowid", 0, 0, dbx.Params{"r": requestID})
 	if err != nil {
 		return nil, err
 	}

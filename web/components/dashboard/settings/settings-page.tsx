@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react"
 import { BoardsSection } from "@/components/dashboard/settings/boards-section"
 import { BrandingSection } from "@/components/dashboard/settings/branding-section"
+import { RoadmapSection } from "@/components/dashboard/settings/roadmap-section"
 import { SettingsSection } from "@/components/dashboard/settings/section"
 import { TagsSection } from "@/components/dashboard/settings/tags-section"
 import { TeamSection } from "@/components/dashboard/settings/team-section"
@@ -10,8 +11,8 @@ import { useSettings } from "@/components/dashboard/settings/use-settings"
 import { Bone } from "@/components/lort/bone"
 import { cn } from "@/lib/utils"
 
-// Services (Email, Voice, Spam protection), Connect (Widget, MCP, Webhooks), Server (Backups,
-// Updates) and the Roadmap switch join this list in later phases.
+// Services (Email, Voice, Spam protection), Connect (Widget, MCP, Webhooks) and Server (Backups,
+// Updates) join this list in later phases.
 const TOC = [
   {
     group: "Your board",
@@ -19,6 +20,7 @@ const TOC = [
       { id: "branding", label: "Branding" },
       { id: "boards", label: "Boards" },
       { id: "tags", label: "Tags" },
+      { id: "roadmap", label: "Roadmap" },
       { id: "team", label: "Team" },
     ],
   },
@@ -134,6 +136,19 @@ export function SettingsPage() {
           )}
           <BoardsSection />
           <TagsSection />
+          {settings.data ? (
+            <RoadmapSection settings={settings.data} save={save} />
+          ) : (
+            <SettingsSection id="roadmap" title="Roadmap">
+              <div aria-busy="true" className="flex items-center gap-4">
+                <div className="flex flex-1 flex-col gap-2">
+                  <Bone w={190} h={14} />
+                  <Bone w="60%" h={12} />
+                </div>
+                <Bone w={44} h={24} />
+              </div>
+            </SettingsSection>
+          )}
           <TeamSection />
         </div>
       </div>
