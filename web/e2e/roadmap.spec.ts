@@ -309,6 +309,25 @@ test.describe("dashboard roadmap", () => {
     await expect(region(page, "Completed").getByRole("button", { name: title, exact: true })).toBeVisible()
   })
 
+  test("a keyboard drop into a collapsed column keeps focus on its strip", async ({ page, request }) => {
+    const title = `Kbd strip ${unique()}`
+    await seedRoadmapRequest(request, title, "planned")
+    await openRoadmap(page)
+    await page.getByRole("button", { name: "Collapse Completed" }).click()
+    const strip = page.getByRole("button", { name: /^Completed, \d+ in the last 30 days\. Expand$/ })
+    const announced = page.locator("[id^=DndLiveRegion]")
+
+    await card(page, title).focus()
+    await page.keyboard.press("Space")
+    await page.keyboard.press("ArrowRight")
+    await expect(announced).toContainText("is over In progress.")
+    await page.keyboard.press("ArrowRight")
+    await expect(announced).toContainText("is over Completed.")
+    await page.keyboard.press("Space")
+    await expect(announced).toContainText(`Moved ${title} to Completed.`)
+    await expect(strip).toBeFocused()
+  })
+
   test("phones get a Move menu and a single column", async ({ page, request }) => {
     const title = `Phone ${unique()}`
     await seedRoadmapRequest(request, title, "planned")

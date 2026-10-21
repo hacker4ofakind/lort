@@ -104,9 +104,13 @@ func TestUndoCompleteRestoresStatusTime(t *testing.T) {
 	}
 }
 
-func TestUndoCompleteWithoutEarlierActivityUsesCreated(t *testing.T) {
+// Creation and completion can fall in the same millisecond: Undo must still put the time back
+// exactly (the stamp hook is told, not left to guess from the value).
+func TestUndoCompleteRestoresTheExactTimeEvenWhenItEqualsTheStoredOne(t *testing.T) {
 	svc, app, board, mara := setup(t)
 	r := testutil.Request(t, app, board, mara, "Quick one", "progress", 0)
+	r, _ = app.FindRecordById("requests", r.Id)
+	before := r.GetDateTime("statusChangedAt")
 	if _, err := svc.SetStatus(r.Id, status.Complete, mara); err != nil {
 		t.Fatal(err)
 	}
@@ -114,8 +118,8 @@ func TestUndoCompleteWithoutEarlierActivityUsesCreated(t *testing.T) {
 		t.Fatal(err)
 	}
 	r, _ = app.FindRecordById("requests", r.Id)
-	if !r.GetDateTime("statusChangedAt").Time().Equal(r.GetDateTime("created").Time()) {
-		t.Errorf("statusChangedAt = %s, want created %s", r.GetDateTime("statusChangedAt"), r.GetDateTime("created"))
+	if got := r.GetDateTime("statusChangedAt"); got.String() != before.String() {
+		t.Errorf("statusChangedAt = %s, want %s", got, before)
 	}
 }
 
@@ -130,4 +134,65 @@ func TestShippedSortIsNewestStatusChangeFirst(t *testing.T) {
 		t.Fatalf("shipped order = %+v, %v", page.Items, err)
 	}
 	near(t, page.Items[0].StatusChangedAt, time.Now().Add(-time.Hour))
+}
+
+// A superuser's record-API edit changes the status and stamps the time without a timeline entry,
+// so Undo can't work the old time out from the activity: the completion remembers it.
+func TestUndoCompleteRestoresTimeAfterAnEditWithoutActivity(t *testing.T) {
+	svc, app, board, mara := setup(t)
+	r := testutil.Request(t, app, board, mara, "Edited by hand", "reviewing", 0)
+	r.Set("status", "progress") // like PATCH /api/collections/requests/records/{id}
+	if err := app.Save(r); err != nil {
+		t.Fatal(err)
+	}
+	entered := time.Now().Add(-48 * time.Hour)
+	testutil.SetStatusTime(t, app, r, entered)
+
+	if _, err := svc.SetStatus(r.Id, status.Complete, mara); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.UndoComplete(r.Id); err != nil {
+		t.Fatal(err)
+	}
+	near(t, statusTime(t, app, r.Id), entered)
+}
+
+func TestUndoCompleteOfALegacyCompletionFallsBackToTheTimeline(t *testing.T) {
+	svc, app, board, mara := setup(t)
+	r := testutil.Request(t, app, board, mara, "Before the field", "progress", 0)
+	started := time.Now().Add(-72 * time.Hour)
+	if _, err := svc.SetStatus(r.Id, status.Complete, mara); err != nil {
+		t.Fatal(err)
+	}
+	// A completion logged before activity remembered the time.
+	if _, err := app.DB().NewQuery("UPDATE activity SET statusSince = '' WHERE request = {:r}").Bind(dbx.Params{"r": r.Id}).Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.DB().NewQuery("UPDATE activity SET created = {:c} WHERE request = {:r}").
+		Bind(dbx.Params{"c": started.UTC().Format("2006-01-02 15:04:05.000Z"), "r": r.Id}).Execute(); err != nil {
+		t.Fatal(err)
+	}
+	// ...with the earlier status change still on the timeline.
+	ac, _ := app.FindCollectionByNameOrId("activity")
+	prev := core.NewRecord(ac)
+	prev.Set("request", r.Id)
+	prev.Set("kind", "status_changed")
+	prev.Set("from", "planned")
+	prev.Set("to", "progress")
+	if err := app.Save(prev); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.DB().NewQuery("UPDATE activity SET created = {:c} WHERE id = {:i}").
+		Bind(dbx.Params{"c": started.Add(-time.Hour).UTC().Format("2006-01-02 15:04:05.000Z"), "i": prev.Id}).Execute(); err != nil {
+		t.Fatal(err)
+	}
+	// The completion row must be the latest for Undo to find it.
+	if _, err := app.DB().NewQuery("UPDATE activity SET created = {:c} WHERE request = {:r} AND \"to\" = 'completed'").
+		Bind(dbx.Params{"c": time.Now().UTC().Format("2006-01-02 15:04:05.000Z"), "r": r.Id}).Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.UndoComplete(r.Id); err != nil {
+		t.Fatal(err)
+	}
+	near(t, statusTime(t, app, r.Id), started.Add(-time.Hour))
 }

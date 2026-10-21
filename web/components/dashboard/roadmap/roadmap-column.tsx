@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { useDndContext, useDroppable } from "@dnd-kit/core"
 import { IconArrowsMinimize, IconPlus } from "@tabler/icons-react"
 import type { CardData } from "@/components/dashboard/roadmap/keyboard"
@@ -44,10 +45,21 @@ export function RoadmapColumn({ col, items, collapsed, busy, fresh, hintId, onTo
   const target = isOver && (active?.data.current as CardData | undefined)?.column !== col.status
   const ring = target && "bg-surface-2 ring-2 ring-primary-text ring-inset"
 
+  // A card dropped with the keyboard into a collapsed column has no card to focus there (the
+  // strip shows none), and the one it left is gone: focus the strip, which says what is inside.
+  const strip = useRef<HTMLButtonElement | null>(null)
+  const focusStrip = collapsed && !!fresh?.focus && items.some((i) => i.id === fresh.id)
+  useEffect(() => {
+    if (focusStrip) strip.current?.focus()
+  }, [focusStrip])
+
   if (collapsed) {
     return (
       <button
-        ref={setNodeRef}
+        ref={(node) => {
+          setNodeRef(node)
+          strip.current = node
+        }}
         type="button"
         onClick={onToggle}
         aria-label={`${col.label}, ${countText(col.status, items.length)}. Expand`}

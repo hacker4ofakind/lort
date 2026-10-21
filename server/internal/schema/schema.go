@@ -219,6 +219,8 @@ func ensureActivity(app core.App) error {
 			Values: []string{"created", "status_changed", "merged_in", "merged_from", "board_changed"}},
 		&core.TextField{Name: "from", Max: 40},
 		&core.TextField{Name: "to", Max: 40},
+		// On a status change: when the request entered `from`, so Undo can put that time back.
+		&core.DateField{Name: "statusSince"},
 	)
 	c.ListRule = types.Pointer("request.visible = true && request.board.isPublic = true")
 	c.ViewRule = c.ListRule

@@ -148,6 +148,39 @@ describe("RoadmapBoard", () => {
     expect(titlesIn("Planned")).not.toContain("Dark mode")
   })
 
+  it("doesn't let an older refetch clear a newer move", async () => {
+    const a = deferred<StatusChange>()
+    const b = deferred<StatusChange>()
+    move.mockImplementation((id) => (id === "a" ? a.promise : b.promise))
+    // The server's roadmap right after the first move only: Calendar view is still Planned.
+    const afterA = data()
+    afterA.progress = [{ ...afterA.planned[0], status: "progress" } as RequestItem, ...afterA.progress]
+    afterA.planned = afterA.planned.slice(1)
+    const afterBoth = { ...afterA, planned: [], completed: [afterA.planned[0], ...afterA.completed] }
+    const first = deferred<Roadmap>()
+    roadmap.mockImplementationOnce(async () => data()) // the first load
+    roadmap.mockImplementationOnce(() => first.promise) // the refetch after move A, still on its way
+    roadmap.mockImplementation(async () => afterBoth) // every refetch after that
+    renderBoard()
+    await screen.findByText("Dark mode")
+
+    await moveVia("Dark mode", "In progress")
+    await act(async () => a.resolve({ from: "planned", to: "progress", roadmap: "" }))
+    await waitFor(() => expect(roadmap).toHaveBeenCalledTimes(2))
+
+    await moveVia("Calendar view", "Completed")
+    await act(async () => b.resolve({ from: "planned", to: "completed", roadmap: "" }))
+    // The old answer, from before move B, lands now.
+    await act(async () => first.resolve(afterA))
+    expect(titlesIn("Completed")).toContain("Calendar view")
+    expect(titlesIn("In progress")).toContain("Dark mode")
+
+    // A second refetch follows, and agrees.
+    await waitFor(() => expect(roadmap).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(titlesIn("Completed")).toContain("Calendar view"))
+    expect(titlesIn("Planned")).not.toContain("Calendar view")
+  })
+
   it("can't lift a card whose move is on its way", async () => {
     move.mockReturnValue(new Promise(() => {}))
     renderBoard()

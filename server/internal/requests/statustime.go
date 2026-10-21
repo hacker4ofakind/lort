@@ -1,12 +1,25 @@
 package requests
 
 import (
+	"sync"
 	"time"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
+
+// restoring holds the requests whose statusChangedAt is being put back by Undo. Inferring that
+// from the value (it differs from the stored one) fails when the restored time happens to equal
+// the stored millisecond, so the caller says so outright.
+var restoring sync.Map
+
+// keepStatusTime tells the stamp hook to leave request id's statusChangedAt as the caller set it,
+// until the returned function is called.
+func keepStatusTime(id string) (release func()) {
+	restoring.Store(id, struct{}{})
+	return func() { restoring.Delete(id) }
+}
 
 // BindStatusTime keeps requests.statusChangedAt true for every write path: a new request gets
 // now, and a save that changes the status gets now unless the caller set the field itself
@@ -22,7 +35,8 @@ func BindStatusTime(app core.App) {
 	})
 	app.OnRecordUpdate("requests").BindFunc(func(e *core.RecordEvent) error {
 		orig := e.Record.Original()
-		if orig != nil &&
+		_, keep := restoring.Load(e.Record.Id)
+		if !keep && orig != nil &&
 			e.Record.GetString("status") != orig.GetString("status") &&
 			e.Record.GetDateTime("statusChangedAt").Time().Equal(orig.GetDateTime("statusChangedAt").Time()) {
 			e.Record.Set("statusChangedAt", time.Now())

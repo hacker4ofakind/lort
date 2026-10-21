@@ -22,8 +22,11 @@ interface Move {
   from: RoadmapStatus
   to: RoadmapStatus
   at: Date
-  /** The server answered; the move stays applied until the roadmap has been refetched. */
-  settled: boolean
+  /**
+   * The server accepted it, as the nth acceptance. The move stays applied until a refetch that
+   * started after that moment has landed (see `reconcile`).
+   */
+  settledAt?: number
 }
 
 interface MoveVars {
@@ -55,7 +58,8 @@ const without = <T>(o: Record<string, T>, id: string) => Object.fromEntries(Obje
  * - While dragging, the board shows a snapshot taken at drag start: a refetch that reorders or
  *   removes the dragged card mid-drag would break dnd-kit.
  * - Drop → unfreeze and start the move in the same event, so the card never flashes back.
- * - One move per card at a time. The roadmap is refetched once the last move settles.
+ * - One move per card at a time. Once no move is on its way, the roadmap is refetched and the
+ *   moves that refetch is known to include are dropped; later ones wait for the next refetch.
  */
 export function useRoadmapMove(data: Roadmap | undefined) {
   const qc = useQueryClient()
@@ -67,11 +71,15 @@ export function useRoadmapMove(data: Roadmap | undefined) {
   const [fresh, setFresh] = useState<{ id: string; focus: boolean } | null>(null)
   const toastIds = useRef(new Map<string, string>()) // request id → its latest move's toast
   const moveCount = useRef(0)
+  const inFlight = useRef(0) // moves sent and not yet answered
+  const accepted = useRef(0) // moves the server has accepted so far
+  const reconciling = useRef(false)
+  const again = useRef(false) // a move was accepted while a refetch was running
 
   const live = useMemo(() => (data ? applyMoves(data, moves) : undefined), [data, moves])
   const view = frozen ?? live
   const busy = useMemo(
-    () => new Set(Object.entries(moves).filter(([, m]) => !m.settled).map(([id]) => id)),
+    () => new Set(Object.entries(moves).filter(([, m]) => m.settledAt === undefined).map(([id]) => id)),
     [moves]
   )
 
@@ -81,6 +89,29 @@ export function useRoadmapMove(data: Roadmap | undefined) {
       qc.invalidateQueries({ queryKey: ["request"] }),
       qc.invalidateQueries({ queryKey: keys.stats }),
     ])
+
+  /**
+   * Refetches, then drops the accepted moves that refetch includes. A move accepted while it runs
+   * may be missing from its answer, so it keeps its overlay and another refetch follows: an older
+   * answer must never clear a newer move.
+   */
+  const reconcile = async () => {
+    if (reconciling.current) {
+      again.current = true
+      return
+    }
+    reconciling.current = true
+    try {
+      do {
+        again.current = false
+        const upto = accepted.current
+        await refresh()
+        setMoves((m) => Object.fromEntries(Object.entries(m).filter(([, x]) => x.settledAt === undefined || x.settledAt > upto)))
+      } while (again.current)
+    } finally {
+      reconciling.current = false
+    }
+  }
 
   const undo = async (v: MoveVars) => {
     setMoves((m) => without(m, v.id))
@@ -97,7 +128,8 @@ export function useRoadmapMove(data: Roadmap | undefined) {
     mutationKey: MUTATION_KEY,
     mutationFn: (v: MoveVars) => moveOnRoadmap(pbAdmin, v.id, v.from, v.to),
     onSuccess: (ch, v) => {
-      setMoves((m) => (m[v.id] ? { ...m, [v.id]: { ...m[v.id], settled: true } } : m))
+      const nth = ++accepted.current
+      setMoves((m) => (m[v.id] ? { ...m, [v.id]: { ...m[v.id], settledAt: nth } } : m))
       if (ch.from === ch.to) return
       if (ch.to === "completed") {
         completionToast({ id: v.toastId, title: v.title, change: ch, onUndo: () => void undo(v), email: config.features.email })
@@ -111,11 +143,10 @@ export function useRoadmapMove(data: Roadmap | undefined) {
       toast(`Couldn't move “${v.title}”. ${errorMessage(err)}`)
       if (err instanceof ClientResponseError && err.status === 409) void qc.invalidateQueries({ queryKey: ["requests"] })
     },
-    onSettled: async () => {
-      // Refetch once, when the last pending move is done (this one still counts as pending).
-      if (qc.isMutating({ mutationKey: MUTATION_KEY }) !== 1) return
-      await refresh()
-      setMoves((m) => Object.fromEntries(Object.entries(m).filter(([, x]) => !x.settled)))
+    onSettled: () => {
+      // Refetch when the last move on its way has been answered.
+      inFlight.current -= 1
+      if (inFlight.current === 0) void reconcile()
     },
   })
 
@@ -135,8 +166,9 @@ export function useRoadmapMove(data: Roadmap | undefined) {
     if (stale) toast.dismiss(stale)
     const toastId = `${id}-${++moveCount.current}`
     toastIds.current.set(id, toastId)
-    setMoves((m) => ({ ...m, [id]: { from, to, at: new Date(), settled: false } }))
+    setMoves((m) => ({ ...m, [id]: { from, to, at: new Date() } }))
     markFresh(id, focus)
+    inFlight.current += 1
     mutation.mutate({ id, title, from, to, toastId })
     return true
   }

@@ -180,6 +180,7 @@ func (s *Service) changeStatus(requestID string, actor *core.Record, decide func
 			return err
 		}
 		from := status.Status(r.GetString("status"))
+		since := r.GetDateTime("statusChangedAt") // when it entered `from`, for Undo
 		to, err := decide(r)
 		if err != nil {
 			return err
@@ -193,7 +194,7 @@ func (s *Service) changeStatus(requestID string, actor *core.Record, decide func
 			return err
 		}
 		ch = Change{From: from, To: to, Roadmap: status.RoadmapChange(from, to)}
-		return logActivity(tx, r.Id, actor, "status_changed", string(from), string(to))
+		return logActivityAt(tx, r.Id, actor, "status_changed", string(from), string(to), since)
 	})
 	return ch, err
 }
@@ -220,14 +221,18 @@ func (s *Service) UndoComplete(requestID string) (Change, error) {
 		if err := tx.Delete(last[0]); err != nil {
 			return err
 		}
-		// The request goes back to the time it entered the old status, which the stamp hook
-		// leaves alone because the field changed with the status.
-		since, err := previousStatusTime(tx, r)
-		if err != nil {
-			return err
+		// The request goes back to the time it entered the old status. The completion row
+		// remembers it; one logged before that field existed falls back to the timeline.
+		since := last[0].GetDateTime("statusSince")
+		if since.IsZero() {
+			if since, err = previousStatusTime(tx, r); err != nil {
+				return err
+			}
 		}
 		r.Set("status", string(from))
 		r.Set("statusChangedAt", since)
+		release := keepStatusTime(r.Id)
+		defer release()
 		if err := tx.Save(r); err != nil {
 			return err
 		}
@@ -329,6 +334,11 @@ func (s *Service) MarkSeen(requestID string) error {
 }
 
 func logActivity(app core.App, requestID string, actor *core.Record, kind, from, to string) error {
+	return logActivityAt(app, requestID, actor, kind, from, to, types.DateTime{})
+}
+
+// logActivityAt is logActivity for a status change, with the time the request entered `from`.
+func logActivityAt(app core.App, requestID string, actor *core.Record, kind, from, to string, since types.DateTime) error {
 	c, err := app.FindCollectionByNameOrId("activity")
 	if err != nil {
 		return err
@@ -342,6 +352,9 @@ func logActivity(app core.App, requestID string, actor *core.Record, kind, from,
 	a.Set("kind", kind)
 	a.Set("from", from)
 	a.Set("to", to)
+	if !since.IsZero() {
+		a.Set("statusSince", since)
+	}
 	return app.Save(a)
 }
 
@@ -362,5 +375,5 @@ func (s *Service) AfterCreate(app core.App, r, author *core.Record) error {
 // LogJoinedRoadmap records that a request was created straight into a roadmap column, as the
 // team member who did it, so the timeline reads "posted this", then "Pending → Planned".
 func (s *Service) LogJoinedRoadmap(app core.App, r, actor *core.Record, to status.Status) error {
-	return logActivity(app, r.Id, actor, "status_changed", string(status.Pending), string(to))
+	return logActivityAt(app, r.Id, actor, "status_changed", string(status.Pending), string(to), r.GetDateTime("statusChangedAt"))
 }
