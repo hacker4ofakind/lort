@@ -279,7 +279,7 @@ Flat at rest; tonal layering (ground → surface → surface-2 → surface-3) ca
 The reference build in `design/components/lort.css` names them `.lt-shadow-sticker`, `.lt-shadow-float`, `.lt-shadow-card-float` and `.lt-shadow-inset-sm`. In the app they are Tailwind theme shadows (`shadow-sticker`, `shadow-float`, `shadow-card-float`, `shadow-inset-sm`), not CSS classes.
 
 ### Named Rules
-**The Only-Stickers-Tilt Rule.** Voted stickers rotate −7° and the logo mark −4°. Nothing else rotates.
+**The Only-Stickers-Tilt Rule.** Voted stickers rotate −7° and the logo mark −4°. Nothing else rotates, including a card being dragged on the roadmap: it scales to 1.02 with the card-float shadow and stays level.
 
 **The Landing Exception.** `/lort-landing` is Lort's own page, not the board's. It always uses Lort Pink (`#cc3a6d`) whatever primary the owner picked, puts its hero and closing call-to-action on pink slabs, and tilts its three hero cards. Nowhere else breaks the Owner's Colour Rule or the Only-Stickers-Tilt Rule.
 
@@ -296,6 +296,7 @@ Pills for everything clickable (buttons, chips, tabs, inputs, nav, floating bars
 - **Chip:** 34px pills on Raised Surface for status, board, tags, add-tag and the visibility switch.
 - **SortTabs:** Trending / Newest with an ink indicator that slides (Motion `layoutId`); the selected label inverts.
 - **FloatingBar:** sort tabs, Board and Status drop-ups (open upward, Clear at the bottom, state in the URL), primary "Suggest something".
+- **Roadmap column and card:** a column is a sunken (ground-sunken) soft rectangle with a status label, a count pill and, on the dashboard, "+" and collapse buttons. A card is a read-only compact sticker, the title, a board pill, tag pills, a Hidden pill for requests off the board, and the author. A card in the air leaves a dashed Dot Spot slot behind; the column under it gets surface-2 and an inset 2px primary-text ring, with its drop hint in ink (primary-text is only guaranteed readable on ground and surface, not surface-2). A collapsed column is a 64px vertical strip that still takes drops (a full-width row on phones). A card is named by its title; the sticker and pills are described, not part of the name.
 - **RequestCard:** sticker left; title, two-line excerpt, meta row (status, board pill, author, comments).
 - **Composer:** prompt-box comment field for every signed-in user: images (≤3), a Public/Internal toggle for admins (no chevron; flat in Public with a hover fill; borderless in Internal with a note-tint hover and a small lock tip), mic only when voice is enabled, round send. While a send is in flight the draft is locked (read-only field, other controls disabled); it clears only once the send succeeds and stays put, with the error shown, if it fails.
 - **TriageBar:** status-driven actions for the dashboard request page; forward action is the one primary button, last.

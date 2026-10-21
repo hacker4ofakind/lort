@@ -407,4 +407,9 @@ Deviations and surprises (the interfaces in the plan are otherwise as built):
 - **Small additions**: `isNotFound` in `lib/errors.ts`; `itemsOf`/`mapItems` exported from `lib/query.ts`; `readCollapsedRaw`/`parseCollapsed`/`COLLAPSED_KEY` in `lib/roadmap.ts`; `SuggestDialog` also takes `onCreated`; `undoToast` takes an `id`; the sidebar item badge is now Requests-only.
 - Tests that were not in the plan: board-level e2e for ordering by votes, overlapping moves, a failed load, skeletons, the phone menu, timeline after a drag, any-column-to-any-column, a stale board and a triaged-away card.
 
+Changes from the two review rounds:
+- **Overlay reconciliation**: moves carry the nth acceptance number, and a refetch drops only moves accepted before it started; a move accepted mid-refetch queues another refetch (`reconcile` in `use-roadmap-move.ts`). The plan's "invalidate when `isMutating === 1`" skipped the refresh for a second move and let the older answer clear its overlay.
+- **Undo restores the exact time**: a status-change activity row records `statusSince` (when the request entered `from`), because superuser record-API edits stamp the time without a timeline entry. Older rows fall back to the timeline. The stamp hook is told to keep the restored time through `keepStatusTime(record)`, keyed by the record instance Undo saves (not the request id), so an overlapping save of the same request is still stamped.
+- **Focus after a keyboard drop into a collapsed column** goes to that column's Expand strip, again for every drop (the effect depends on the `fresh` object).
+
 For the next stage: 2B's changelog can reuse `publicFeature` (api.go), the nav (`boardNav` in `components/board/links.ts`), `DENSE_PAGES` in `dashboard-shell.tsx` if the editor needs the rail, and `completionToast` for anything that offers an Undo. Real-hardware touch behaviour (long-press lift, swipe-to-scroll) is `[user-only]` and not verified.

@@ -122,10 +122,10 @@ Frontend rules: `design/` is treated like a Figma file. It shows how the app loo
 | `users` (auth) | name, avatar, isAdmin, banned, verified, notify {shipped, changelog, replies}, unsubscribeToken | Name defaults to the part of the email before the @. Banned users can sign in and read but cannot post, vote or comment. |
 | `boards` | name, order, isPublic, requireApproval | The top board is the default for new suggestions. Private boards are visible to the team only. |
 | `tags` | name, order | Admin-managed. Users pick from them when suggesting. No colours (status colours are reserved). |
-| `requests` | board, author, title, body, images (≤3), tags, status, visible, awaitingApproval, upvoteCount, trendScore, mergedInto, teamSeenAt, statusChangedAt, created, updated | `visible=false` hides it from the public board. `statusChangedAt` is when it entered its current status (stamped by a hook on every status change, restored by Undo); the roadmap reads it. `teamSeenAt` null drives the "New" marker. Images are protected files: they follow the request's view rule, so public ones load without a token and hidden ones need a PocketBase file token. |
+| `requests` | board, author, title, body, images (≤3), tags, status, visible, awaitingApproval, upvoteCount, trendScore, mergedInto, teamSeenAt, statusChangedAt, created, updated | `visible=false` hides it from the public board. `statusChangedAt` is when it entered its current status (stamped by a model hook on every status change, whichever route made it; Undo sets it back explicitly, and only for the record instance it saves; clients can't write it); the roadmap reads it. `teamSeenAt` null drives the "New" marker. Images are protected files: they follow the request's view rule, so public ones load without a token and hidden ones need a PocketBase file token. |
 | `votes` | user, request | Unique (user, request). The author's vote is created with the request, in the same transaction. Deleting a vote by any route (including a deleted account's cascade) recounts its request in the same transaction. |
 | `comments` | request, author, parent, body, images (≤3), internal | One level of replies: `parent` must be a top-level comment. Internal comments are team-only. Images are protected like request images. |
-| `activity` | request, actor, kind (status_changed, merged_in, merged_from, board_changed, created), from, to | The request timeline. |
+| `activity` | request, actor, kind (status_changed, merged_in, merged_from, board_changed, created), from, to, statusSince | The request timeline. On a status change, `statusSince` is when the request entered `from`, so Undo restores that exact time (older rows fall back to the previous status entry on the timeline). Same-millisecond rows keep their insertion order. |
 | `changelogs` | title, slug, body (markdown), cover, labels (New/Improved/Fixed), requests, state (draft/scheduled/published), publishAt, publishedAt, lastEmailedAt, completeAttached | |
 | `settings` | single record: branding, roadmap, email, voice, turnstile, widget, backups, update check | Secret fields encrypted. |
 | `api_keys` | name, hash (sha256), prefix, scope (read/full), lastUsedAt, createdBy | The full key is shown once at creation. |
@@ -208,7 +208,7 @@ The public site carries the owner's brand: app name, logo and primary colour. "L
   - Planned and In progress sort by votes; Completed shows the last 30 days, newest shipped first.
   - It shows visible requests on public boards only (no exception for the author's own hidden ones).
   - A "View all N shipped" link (shown when there are more than the column holds) opens `/roadmap/shipped`: every shipped request, newest shipped first, in pages of 20.
-  - When the roadmap is turned off in Settings, the nav pill disappears and `/roadmap` and `/roadmap/shipped` show a friendly "No public roadmap yet" message; the roadmap endpoints answer 404 to everyone but superusers. The nav only ever shows pages that exist in the running build (Roadmap and Changelog join in Phase 2).
+  - When the roadmap is turned off in Settings, the nav pill disappears and `/roadmap` and `/roadmap/shipped` show a friendly "No public roadmap yet" message; the roadmap endpoints answer 404 to everyone but superusers. The nav only ever shows pages that exist in the running build (Roadmap arrived in Phase 2A, Changelog joins in Phase 2B).
 - **`/changelog`:**
   - Posts are listed newest first, each with its date, label chips, title and excerpt.
   - A label filter (All, New, Improved, Fixed) lives in the URL.
@@ -254,7 +254,7 @@ Always on: per-IP and per-user rate limits (sign-up, request creation, comments,
 
 ## 6. Dashboard (`/dashboard`)
 
-Sign-in is for superusers only. The sidebar has Requests (with an "N new" badge), Roadmap, Changelog, then Docs and Settings at the bottom, then the signed-in admin with the Lort version (its menu has View the board and Sign out). A dashboard session also signs the admin in on the board as their linked team profile (section 3), so their comments carry the Team badge. It collapses to a 76px icon rail (remembered per browser); in the rail the labels are hidden visually but kept for screen readers. The sidebar only shows pages that exist in the running build (Roadmap and Changelog join in Phase 2, Docs in Phase 6). Below 768px the sidebar becomes a top bar with a menu sheet.
+Sign-in is for superusers only. The sidebar has Requests (with an "N new" badge), Roadmap, Changelog, then Docs and Settings at the bottom, then the signed-in admin with the Lort version (its menu has View the board and Sign out). A dashboard session also signs the admin in on the board as their linked team profile (section 3), so their comments carry the Team badge. It collapses to a 76px icon rail (remembered per browser); in the rail the labels are hidden visually but kept for screen readers. The sidebar only shows pages that exist in the running build (Roadmap arrived in Phase 2A, Changelog joins in Phase 2B, Docs in Phase 6). Below 768px the sidebar becomes a top bar with a menu sheet.
 
 ### 6.1 Requests (`/dashboard/requests`)
 - Header: title, "142 total · 38 waiting for you" (waiting = Pending + Reviewing), a Live indicator, refresh button, and "New request" (opens Suggest something as the admin's board profile, optionally on behalf of an email, in one save: see section 3). The counts come from `GET /api/lort/stats`, which leaves merged requests out.
@@ -447,7 +447,7 @@ Each phase ends with a working container.
    - Pages: the public board and request page, the dashboard requests table, the request page with triage and merge, and the Settings sections for Branding, Boards, Tags and Team.
    - The design system rebuilt in `web/` with shadcn/ui and Tailwind (2.3), plus skeletons for these pages.
 2. **Roadmap and changelog** (planned as 2A roadmap, then 2B changelog):
-   - The public and dashboard roadmaps.
+   - The public and dashboard roadmaps (2A, done).
    - The changelog editor with scheduling, and the public changelog pages.
 3. **Email:** SMTP, templates, verification and reset, the three notification categories, unsubscribe, and Settings → Email.
 4. **Webhooks and MCP:** both features, plus API keys and their Settings sections.
