@@ -25,7 +25,7 @@ You need:
 
    On Windows, run `./setup.ps1` in PowerShell 7.4 or later.
 
-3. Answer the questions: your board's address, then an email and password for your admin account. Setup checks your DNS record and builds the image, then writes your settings to `.env` in this folder.
+3. Setup checks your machine and builds the image (a few minutes the first time). Then it asks for your board's address, checking its DNS record, and an email and password for your admin account. Your settings go into `.env` in this folder; the password doesn't.
 4. Run the `docker run` line setup prints at the end. Then open your board, and sign in to `/dashboard` with your admin account.
 
 That's it. Setup picks how Lort meets the internet:
@@ -33,11 +33,13 @@ That's it. Setup picks how Lort meets the internet:
 - **Ports 80 and 443 free:** Lort gets its own HTTPS certificate from Let's Encrypt.
 - **Ports taken (you already run nginx or Caddy):** Lort listens on `127.0.0.1:4052`. Setup prints a ready-to-paste nginx block, a Caddy block, and a one-line prompt you can hand to your coding agent.
 
-Running setup again offers each saved answer, so you can change one thing and keep the rest.
+Running setup again offers each saved answer, so you can change one thing and keep the rest. If Lort is already running, or a stopped `lort` container is still around, setup tells you to remove it before running the new line. Your data stays in the `lort_data` volume.
 
 ### Keep `.env` safe
 
-`.env` holds `LORT_ENCRYPTION_KEY`, the key to your board's settings. Keep a copy somewhere safe. Without it, a new key can't read your existing data. Setup refuses to make a new key for a board that already has data, and tells you where the old key might still be.
+`.env` holds `LORT_ENCRYPTION_KEY`, the key to your board's settings. Keep a copy somewhere safe. Without it, a new key can't read your existing data. Setup refuses to make a new key for a board that already has data, and tells you where the old key might still be (a copy of `.env`, `.env.previous` next to it, or `docker inspect lort`).
+
+Setup keeps `.env` readable by you alone and never empties it. It saves the previous version as `.env.previous` whenever it writes.
 
 ## Forgot the admin password?
 
@@ -47,7 +49,7 @@ On the server, in the `lort` folder:
 ./setup.sh --reset-admin
 ```
 
-It asks for the admin's email and a new password. The password is never shown, saved in a file or passed on the command line.
+It asks for the admin's email and a new password. The password is never shown, saved in a file or passed on the command line, and every old dashboard session is signed out.
 
 ## Try it on your own computer
 

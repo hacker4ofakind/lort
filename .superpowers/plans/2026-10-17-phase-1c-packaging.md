@@ -318,17 +318,22 @@
 
 **Deviations and why**
 - **tini runs as lort, not root.** The run line drops `CAP_KILL`, so a root tini couldn't forward SIGTERM to a uid-10001 `lort` (`[FATAL tini] Operation not permitted`, exit 1 on every `docker stop`). The entrypoint is now PID 1, fixes `/data`, then `exec setpriv … tini -- lort`. `ENTRYPOINT ["docker-entrypoint.sh"]`.
-- **Wizard flags:** besides `--workdir --ports-free --os`, the wrappers pass `--container-running=yes|no` (the wizard can't see Docker; it skips the admin step when Lort is live) and `--script=./setup.sh|./setup.ps1` (so advice names the script the owner ran, e.g. Git Bash on Windows). `--data` defaults to `$LORT_DATA` or `/data/pb_data`.
+- **Wizard flags:** besides `--workdir --ports-free --os`, the wrappers pass `--container-running=yes|no` (the wizard can't see Docker; it skips the admin step when Lort is live), `--container-exists=yes|no` (a stopped `lort` still holds the name, so setup prints `docker rm lort` before the run line; review round 1) and `--script=./setup.sh|./setup.ps1` (so advice names the script the owner ran, e.g. Git Bash on Windows). `--data` defaults to `$LORT_DATA` or `/data/pb_data`.
 - **`setup.Host`** is `{Prompt, Net, Admin}`; the work and data folders are plain paths in `Options` (tests use temp dirs, not a Files fake). `Admin` has `Check(ctx,key)`, `Create(ctx,key,email,pw)`, `Exists`, `Reset`. `AppAdmin` (in-process) backs `setup-admin` and `reset-admin`; `childAdmin` re-execs `lort setup-admin --dir …` as uid 10001 with the key in its environment.
 - **`web.Proxy`** takes a third argument, `web.ProxyOptions{HeaderTimeout, HSTS}` (default header timeout 20 s). It sets `Referrer-Policy`, and HSTS only with `LORT_TLS=auto` or a TLS request; PocketBase already sets nosniff/`X-Frame-Options`, so the proxy drops its copies and sets each once.
 - **`config.SettingError{Var, Problem}`**: `Error()` appends the `.env` advice; setup shows `Problem` alone. `LORT_URL` with `auto` must be `https://` and portless.
 - **`team.HasAdmin`** (ignores the installer email) is the one "admin exists" check; `SeedFirstAdmin` also deletes a leftover `__pbinstaller` account.
 - **`envfile.Write(path, old, data)`** refuses if the file changed since `old` was read (optimistic check under `.env.lock`), so two wizards can't mint two keys. Malformed, repeated, empty or wrong-length key lines stop setup.
-- `setup.sh` on Windows (Git Bash) also runs `icacls` on a new `.env`; `umask` means nothing to NTFS.
+- **`.env` is made owner-only on every run, by both wrappers** (not only when they create it): `chmod 600`, or on Windows `icacls /reset` then `/inheritance:r /grant:r` for the current user (by SID in `setup.ps1`), with `icacls` called by its full path. GitHub's Windows runners give new files explicit SYSTEM and Administrators entries, which `/grant:r` alone kept (review round 2). A symlinked `.env` is left for the wizard to refuse.
 - Next's build worker count comes from `NEXT_BUILD_CPUS` (read in `next.config.ts` as `experimental.cpus`); there is no built-in env var.
 - Fonts come from Fontsource's variable Latin woff2 files (`app/fonts/*-latin-wght.woff2`, OFL texts beside them). Families are `figtree`/`bricolage` with generated Arial fallback metrics.
 - The e2e admin lives in `test/e2e.env`; `web/e2e/helpers.ts`, `e2e/server.mjs` and `e2e-container.sh` read it. `container.sh` uses its own `check@lort.test`.
-- Pester fakes are `.cmd`/`sh` shims on a controlled `PATH` (global PowerShell function fakes leaked between tests).
+- Pester fakes are `.cmd`/`sh` shims on a `PATH` that holds nothing else: global PowerShell function fakes leaked between tests, and System32 holds a real `docker.exe` on GitHub's Windows runners.
+
+**Review fixes** (round 1 `e022b69`, round 2 `b3a64af`)
+- `lort healthcheck` reads each page to the end; a page that sends 200 and stalls is unhealthy (`checkHealth(client, base)` is the testable part).
+- Ownership repair covers the whole volume: the entrypoint runs `find /data ( ! -uid 10001 -o ! -gid 10001 ) -print -quit` and then one `chown -R -h`; `ownData` re-owns each mismatched entry with `Lchown`. Neither follows symlinks. This is a full walk of a healthy volume at every boot, cheap at Lort's sizes but worth revisiting if uploads grow large.
+- `AppAdmin.find`: the exact match first (`FindAuthRecordByEmail`), then a Go `strings.EqualFold` scan of all superusers that accepts exactly one match. PocketBase v0.40.5's `_superusers` email index is case-sensitive, and SQLite's `LOWER` is ASCII-only, so neither could do it. The installer email never matches.
 
 **Surprises**
 - pnpm 12 records `packageManager` in the lockfile: pinning it needs a lockfile update or `--frozen-lockfile` fails.
@@ -340,3 +345,4 @@
 - `RunLine(mode)` in `internal/setup/ports.go` is the single source (`lort run-line https|proxy`).
 - Admin step order is enforced: key → `.env` (read back) → chown `/data` → `setup-admin` as 10001.
 - Not verified here: MV-8's real-internet half, MV-9 (needs a public host and domain). CI runs bash on macOS 3.2 and Pester on Windows; both were run locally (bash 3.2 in Docker, Pester on Windows 11 and Linux pwsh).
+- The Manual Verification Checklist's MV-6 step should kill Next through `/proc` (as `test/container.sh` does) rather than with `pkill`.
