@@ -34,6 +34,26 @@ func TestSeedFirstAdminOnlyOnce(t *testing.T) {
 	}
 }
 
+func TestSeedFirstAdminIgnoresTheInstaller(t *testing.T) {
+	app := testutil.NewApp(t)
+	testutil.Superuser(t, app, core.DefaultInstallerEmail)
+	if has, err := team.HasAdmin(app); err != nil || has {
+		t.Fatalf("HasAdmin with only the installer = %v, %v", has, err)
+	}
+	if err := team.SeedFirstAdmin(app, "luk@driftnote.app", "correcthorse"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.FindAuthRecordByEmail(core.CollectionNameSuperusers, "luk@driftnote.app"); err != nil {
+		t.Fatalf("real admin not seeded: %v", err)
+	}
+	if _, err := app.FindAuthRecordByEmail(core.CollectionNameSuperusers, core.DefaultInstallerEmail); err == nil {
+		t.Error("the installer superuser should be gone once a real admin exists")
+	}
+	if has, _ := team.HasAdmin(app); !has {
+		t.Error("HasAdmin = false after seeding")
+	}
+}
+
 func TestInviteAndRemove(t *testing.T) {
 	app := testutil.NewApp(t)
 	luk := testutil.Superuser(t, app, "luk@driftnote.app")

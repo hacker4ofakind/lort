@@ -61,27 +61,42 @@ func Profile(app core.App, superuser *core.Record) (*core.Record, error) {
 	return p, nil
 }
 
-// SeedFirstAdmin creates the first superuser and profile from setup's answers.
-// It does nothing once any superuser exists.
+// HasAdmin reports whether a real superuser exists. PocketBase's installer account
+// (__pbinstaller@example.com) doesn't count.
+func HasAdmin(app core.App) (bool, error) {
+	n, err := app.CountRecords(core.CollectionNameSuperusers, dbx.Not(dbx.HashExp{"email": core.DefaultInstallerEmail}))
+	return n > 0, err
+}
+
+// SeedFirstAdmin creates the first superuser and profile from setup's answers, and removes
+// PocketBase's installer account if an older boot left one. It does nothing once a real
+// superuser exists.
 func SeedFirstAdmin(app core.App, email, password string) error {
 	if email == "" || password == "" {
 		return nil
 	}
-	if n, err := app.CountRecords(core.CollectionNameSuperusers); err != nil || n > 0 {
+	if has, err := HasAdmin(app); err != nil || has {
 		return err
 	}
 	c, err := app.FindCollectionByNameOrId(core.CollectionNameSuperusers)
 	if err != nil {
 		return err
 	}
-	su := core.NewRecord(c)
-	su.SetEmail(email)
-	su.SetPassword(password)
-	if err := app.Save(su); err != nil {
-		return err
-	}
-	_, err = Profile(app, su)
-	return err
+	return app.RunInTransaction(func(tx core.App) error {
+		su := core.NewRecord(c)
+		su.SetEmail(email)
+		su.SetPassword(password)
+		if err := tx.Save(su); err != nil {
+			return err
+		}
+		if _, err := Profile(tx, su); err != nil {
+			return err
+		}
+		if installer, err := tx.FindAuthRecordByEmail(core.CollectionNameSuperusers, core.DefaultInstallerEmail); err == nil {
+			return tx.Delete(installer)
+		}
+		return nil
+	})
 }
 
 // Member is one row of Settings → Team.

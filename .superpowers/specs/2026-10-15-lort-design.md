@@ -31,37 +31,45 @@ When this spec and a canvas artboard disagree on layout, the artboard wins. When
 ### 1.1 Where it runs
 A VPS or any Docker host with persistent volumes (Hetzner, DigitalOcean, Railway, Fly). Vercel and Netlify are not supported, and the README says so in its first section. Minimum host: 1 GB RAM without voice, 2 GB with voice.
 
-### 1.2 `setup.sh` (bash) and `setup.ps1` (PowerShell)
-Both scripts behave identically and speak in Lort's voice. Steps, in order:
+### 1.2 `lort setup`, with `setup.sh` (bash) and `setup.ps1` (PowerShell) as thin wrappers
+The wizard is one Go subcommand, `lort setup`, so every OS gets the same steps in Lort's voice from one implementation. The wizard ships in the image and runs before Lort does, as a throwaway container. The two scripts only do what the host alone can know, then hand over:
 
-1. **Requirements.** Check for Docker (daemon reachable) and git. If either is missing, print the official docs link and the one-line install for the detected OS, then exit.
+1. Check for Docker (daemon reachable) and git. If either is missing, print the official docs link and the one-line install for the detected OS, then exit.
+2. Check whether ports 80 and 443 are free.
+3. Build the image: `docker build -t lort --build-arg LORT_VERSION=<git describe> .`
+4. Run the wizard: `docker run --rm -it --entrypoint lort -v "$PWD":/work -v lort_data:/data lort setup --workdir /work --ports-free=<yes|no> --os=<linux|mac|windows>`. The wizard runs as root for this one run (so it can write `.env` into the folder and give it the folder owner's ownership) and creates the admin as the `lort` user.
+
+Steps the wizard runs, in order:
+
+1. **Requirements.** Already checked by the wrapper (above); the wizard only reports what the wrapper found.
 2. **Public URL.** Ask for it (`feedback.yoursite.com`). Resolve its A/AAAA records and compare with this machine's public IP (fetched from a public echo service). On mismatch, explain how to add the record and offer to re-check or continue anyway.
-3. **Admin account.** Ask for email, password, and password confirmation (hidden input, at least 8 characters).
+3. **Admin account.** Ask for email, password, and password confirmation (hidden input, 8 to 71 characters: PocketBase's bcrypt limit). The wizard creates the superuser and its team profile directly in the `lort_data` volume, with the password read from the terminal and never passed as an argument or environment variable. The password is not written to `.env` or the container environment. If the volume already holds an admin, the wizard says so and skips this step (a changed email would only point at an account that doesn't exist).
 4. **Email (optional).** "Send emails? (verification, 'it shipped', changelog)". Yes starts the Resend walkthrough: create an account → add the domain → add the DNS records it shows → paste an API key. The script verifies the key against the Resend API. A hidden "other SMTP" choice (type `smtp` at the prompt) asks for host, port, username, password and sender instead. No means every email feature is off.
 5. **Voice dictation (optional).** Explain that it runs Whisper on the server. If total RAM is under 2 GB, warn and default to No.
 6. **Cloudflare Turnstile (optional).** Ask for site key and secret.
-7. **Ports.** Check whether 80 and 443 are free. Free: Lort terminates HTTPS itself (PocketBase's built-in Let's Encrypt autocert). Taken: Lort listens on plain HTTP `:4052`; the script prints a ready-to-paste nginx block and Caddy block for the URL, plus a short prompt the owner can hand to their coding agent ("Add a reverse proxy from feedback.yoursite.com to 127.0.0.1:4052 with HTTPS…").
-8. **Write `.env`** (mode 600) with every answer and a random 32-byte `LORT_ENCRYPTION_KEY`, then run `docker build -t lort .`.
+7. **Ports.** Use the wrapper's answer for 80 and 443. Free: Lort terminates HTTPS itself (PocketBase's built-in Let's Encrypt autocert). Taken: Lort listens on plain HTTP `:4052`; the wizard prints a ready-to-paste nginx block and Caddy block for the URL (with HSTS), plus a short prompt the owner can hand to their coding agent ("Add a reverse proxy from feedback.yoursite.com to 127.0.0.1:4052 with HTTPS…").
+8. **Write `.env`** (mode 600, in the working folder) with every answer except the admin password and a random 32-byte `LORT_ENCRYPTION_KEY`. Lines the owner added by hand (such as `LORT_PB_ADMIN=1`) are kept. If a `lort_data` volume or a `lort` container already exists but `.env` has no key, the wizard stops and explains: a new key could not read the old data.
 9. **Print the run command** for the detected mode, exactly:
-   - HTTPS mode: `docker run -d --name lort --restart unless-stopped -p 80:80 -p 443:443 -v lort_data:/data --env-file .env lort`
-   - Proxy mode: `docker run -d --name lort --restart unless-stopped -p 127.0.0.1:4052:4052 -v lort_data:/data --env-file .env lort`
+   - HTTPS mode: `docker run -d --name lort --restart unless-stopped --cap-drop=ALL --cap-add=CHOWN --cap-add=SETUID --cap-add=SETGID --cap-add=DAC_OVERRIDE --cap-add=FOWNER --security-opt no-new-privileges --log-opt max-size=10m --log-opt max-file=3 -p 80:80 -p 443:443 -v lort_data:/data --env-file .env lort`
+   - Proxy mode: `docker run -d --name lort --restart unless-stopped --cap-drop=ALL --cap-add=CHOWN --cap-add=SETUID --cap-add=SETGID --cap-add=DAC_OVERRIDE --cap-add=FOWNER --security-opt no-new-privileges --log-opt max-size=10m --log-opt max-file=3 -p 127.0.0.1:4052:4052 -v lort_data:/data --env-file .env lort`
 
-Re-running the script with an existing `.env` offers to keep each saved answer.
+Re-running the script with an existing `.env` offers to keep each saved answer. Lort is deliberately one container started by one `docker run`, never Docker Compose: a vibecoder's agent should have one command to read.
 
 ### 1.3 Other script modes
 - `--update`: creates a backup inside the running container (`docker exec lort lort backup create pre-update`), tags the current image `lort:previous`, runs `git pull`, rebuilds, then stops, removes and re-runs the container with the same command.
 - `--rollback`: re-runs the container from `lort:previous` and restores the `pre-update` backup.
-- `--reset-admin`: asks for an admin email and a new password (hidden input) and runs PocketBase's built-in `docker exec lort lort superuser update <email> <password>`. The dashboard sign-in page points here ("Forgot it? On the server, run `./setup.sh --reset-admin`").
+- `--reset-admin`: asks for an admin email and a new password (hidden input) and runs `docker exec -it -u lort lort lort reset-admin`. The Go subcommand asks for the email and reads the new password from the terminal, so it is never an argument and never in the process list, and says what went wrong (container not running, no such admin, bad password). The dashboard sign-in page points here ("Forgot it? On the server, run `./setup.sh --reset-admin`").
 
 ### 1.4 Configuration lifecycle
-`.env` seeds the first boot. After that the database is the source of truth: email, voice, Turnstile and branding are changed in Settings, and `.env` values for them are ignored once a settings record exists. `LORT_ADMIN_EMAIL` / `LORT_ADMIN_PASSWORD` are only used when no superuser exists. `LORT_URL`, `LORT_TLS` (`auto` or `off`) and `LORT_ENCRYPTION_KEY` are read on every boot. Secrets (SMTP password, API keys, S3 keys, Turnstile secret, webhook secrets) are stored encrypted with PocketBase's settings encryption using `LORT_ENCRYPTION_KEY`. No secret is ever baked into an image layer.
+`.env` seeds the first boot. After that the database is the source of truth: email, voice, Turnstile and branding are changed in Settings, and `.env` values for them are ignored once a settings record exists. `LORT_ADMIN_EMAIL` / `LORT_ADMIN_PASSWORD` are a developer fallback, used only when no superuser exists; setup creates the admin in the volume and never writes them to `.env`. `LORT_URL`, `LORT_TLS` (`auto` or `off`) and `LORT_ENCRYPTION_KEY` are read on every boot. Secrets (SMTP password, API keys, S3 keys, Turnstile secret, webhook secrets) are stored encrypted with PocketBase's settings encryption using `LORT_ENCRYPTION_KEY`. No secret is ever baked into an image layer.
 
 ## 2. Architecture
 
 ### 2.1 Container
 ```
 tini (PID 1)
-└── lort            Go binary, the only public listener
+└── entrypoint      starts as root only to chown /data, then drops to the `lort` user (uid 10001) with setpriv
+    └── lort        Go binary, the only public listener
     ├── PocketBase (embedded as a Go framework): data, auth, realtime SSE, files, backups
     ├── TLS on :80/:443 via PocketBase's autocert (LORT_TLS=auto), or plain HTTP on :4052 (LORT_TLS=off)
     ├── reverse proxy: routes requests (2.2)
@@ -70,7 +78,7 @@ tini (PID 1)
     ├── whisper.cpp runner (only when voice is on)
     └── supervises: node server.js   Next.js standalone on 127.0.0.1:3000
 ```
-The Go binary starts Next, restarts it with backoff if it exits, and forwards SIGTERM for a graceful stop. Everything persistent lives in the `/data` volume: `/data/pb_data` (database, uploads, backups), `/data/certs`, `/data/models`.
+The Go binary starts Next, restarts it with backoff if it exits, and forwards SIGTERM for a graceful stop. Next does not receive `LORT_ENCRYPTION_KEY`. In proxy mode (`LORT_TLS=off`) Lort reads the visitor's address from `X-Forwarded-For` only when the connection itself comes from a loopback or private address; otherwise it ignores the header and uses the real address, so per-IP rate limits can't be dodged. With `LORT_TLS=auto` it trusts no header. `docker exec` commands run with `-u lort`. Everything persistent lives in the `/data` volume: `/data/pb_data` (database, uploads, backups, and certificates in `.autocert_cache`), `/data/models`.
 
 ### 2.2 Routing (inside `lort`)
 | Path | Handler |
@@ -411,7 +419,7 @@ whisper.cpp with the q5 quantised large-v3-turbo model. The model downloads to `
 
 ## 12. Testing
 
-- **Go unit tests:** status transitions and triage rules, merge (vote moving and dedupe), trending score, slug generation and stability, HMAC signing, job queue (scheduling, cancel/undo, retry, crash recovery), email gating (7-day rule, opt-outs, email off), webhook threshold firing once.
+- **Go unit tests:** status transitions and triage rules, merge (vote moving and dedupe), trending score, slug generation and stability, HMAC signing, job queue (scheduling, cancel/undo, retry, crash recovery), email gating (7-day rule, opt-outs, email off), webhook threshold firing once, the `lort setup` wizard (answers to `.env`, kept lines, password limits, DNS verdicts, key-mismatch stop) and `reset-admin`.
 - **Go integration tests** against a PocketBase test app: API rules, `/api/lort/*` endpoints, MCP tools per scope (read keys cannot call full tools, human-only tools absent).
 - **Vitest:** frontend logic (filters to URL, optimistic vote, primary colour contrast adjustment, composer limits).
 - **Playwright e2e:** sign up, suggest with similar suggestions, vote, comment, triage through every status with undo, roadmap drag with mouse and keyboard, changelog draft → schedule → publish, settings toggles hide features. Run in both themes; axe checks on every page. The suite runs against the real stack: `web/e2e/start.sh` builds the Go server and the Next.js standalone output and starts `lort` on a throwaway data directory, and global setup seeds boards and tags and turns Lort's rate limits off (the suite signs up more people per minute than one IP is allowed).

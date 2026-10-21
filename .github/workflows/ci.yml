@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Go server
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then echo "Run gofmt -w on:"; echo "$unformatted"; exit 1; fi
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  web:
+    name: Web app
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+
+  wrappers-bash:
+    name: setup.sh (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      # macOS runs the suite with its own /bin/bash, which is 3.2.
+      - run: /bin/bash --version | head -1 && /bin/bash test/wrapper.test.sh
+      - if: runner.os == 'Linux'
+        run: shellcheck setup.sh docker-entrypoint.sh test/container.sh test/e2e-container.sh test/wrapper.test.sh
+
+  wrappers-pwsh:
+    name: setup.ps1 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Pester and PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module Pester -RequiredVersion 5.7.1 -Force -Scope CurrentUser -SkipPublisherCheck
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force -Scope CurrentUser
+          Import-Module Pester -RequiredVersion 5.7.1
+          $r = Invoke-Pester -Path test/wrapper.Tests.ps1 -PassThru -Output Detailed
+          $findings = @(Invoke-ScriptAnalyzer -Path setup.ps1) + @(Invoke-ScriptAnalyzer -Path test/wrapper.Tests.ps1)
+          $findings | Format-Table -AutoSize | Out-String | Write-Output
+          if ($r.FailedCount -gt 0 -or $findings.Count -gt 0) { exit 1 }
+
+  image:
+    name: Image, container checks and Playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # git describe needs the tags
+      - id: version
+        run: echo "version=$(git describe --tags --always --dirty)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: lort
+          build-args: LORT_VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Container checks
+        working-directory: ${{ runner.temp }}
+        env:
+          LORT_EXPECT_VERSION: ${{ steps.version.outputs.version }}
+        run: bash "$GITHUB_WORKSPACE/test/container.sh" lort
+      - name: Start Lort for Playwright
+        working-directory: ${{ runner.temp }}
+        run: bash "$GITHUB_WORKSPACE/test/e2e-container.sh" lort
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Playwright
+        working-directory: web
+        env:
+          LORT_E2E_CONTAINER: "1"
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+          pnpm e2e
+      - name: Lort's log
+        if: failure()
+        run: docker logs lort-check-e2e 2>&1 | tail -200 || true
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-results
+          path: web/test-results
+          retention-days: 7

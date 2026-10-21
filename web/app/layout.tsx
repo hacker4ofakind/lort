@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { Bricolage_Grotesque, Figtree } from "next/font/google"
+import localFont from "next/font/local"
 import { headers } from "next/headers"
 
 import "./globals.css"
@@ -9,9 +9,17 @@ import { CONFIG_HEADER, parseConfig } from "@/lib/config"
 import { favicon } from "@/lib/favicon"
 import { cn } from "@/lib/utils"
 
-// Self-hosted at build time by next/font.
-const figtree = Figtree({ subsets: ["latin"], variable: "--font-figtree", weight: ["400", "500", "600", "700"] })
-const bricolage = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-bricolage", weight: ["700", "800"] })
+// Variable fonts shipped in the repo (app/fonts, SIL OFL 1.1), so building needs no network.
+const figtree = localFont({
+  src: "./fonts/figtree-latin-wght.woff2",
+  variable: "--font-figtree",
+  weight: "400 700",
+})
+const bricolage = localFont({
+  src: "./fonts/bricolage-grotesque-latin-wght.woff2",
+  variable: "--font-bricolage",
+  weight: "700 800",
+})
 
 export async function generateMetadata(): Promise<Metadata> {
   const config = parseConfig((await headers()).get(CONFIG_HEADER))
