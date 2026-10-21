@@ -8,5 +8,4 @@ server/lort
 
 # The owner's settings and setup's working copies: never committed
 .env
-.env.previous
-.env.lock
+.env.*
