@@ -22,6 +22,12 @@ export const keys = {
   tags: ["tags"] as const,
   settings: ["settings"] as const,
   user: (id: string) => ["user", id] as const,
+  // Changelog keys never start with "requests", so the request cache walkers skip them.
+  changelog: (label: string) => ["changelog", label] as const,
+  post: (slug: string) => ["changelog", "post", slug] as const,
+  teamPosts: (params: Record<string, string>) => ["changelogs", params] as const,
+  editorPost: (id: string) => ["changelogs", "post", id] as const,
+  failedPosts: ["changelogs", "failed"] as const,
 }
 
 export function makeQueryClient() {

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -33,7 +34,8 @@ type Config struct {
 	PrimaryColor    string   `json:"primaryColor"`
 	ShowLandingCard bool     `json:"showLandingCard"`
 	RoadmapPublic   bool     `json:"roadmapPublic"`
-	Boards          []Ref    `json:"boards"` // public boards, in order
+	Changelog       bool     `json:"changelog"` // at least one post is published
+	Boards          []Ref    `json:"boards"`    // public boards, in order
 	Tags            []Ref    `json:"tags"`
 	Features        Features `json:"features"`
 	Version         string   `json:"version"`
@@ -57,12 +59,17 @@ func Load(app core.App) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	published, err := app.CountRecords("changelogs", dbx.HashExp{"state": "published"})
+	if err != nil {
+		return Config{}, err
+	}
 	return Config{
 		AppName:         settings.GetString("appName"),
 		Logo:            logo,
 		PrimaryColor:    settings.GetString("primaryColor"),
 		ShowLandingCard: settings.GetBool("showLandingCard"),
 		RoadmapPublic:   settings.GetBool("roadmapPublic"),
+		Changelog:       published > 0,
 		Boards:          refs(boards),
 		Tags:            refs(tags),
 		Version:         Version,
@@ -78,7 +85,7 @@ func refs(rs []*core.Record) []Ref {
 }
 
 // Cache holds the config and its header encoding, and drops them whenever settings, boards
-// or tags change (after the change commits).
+// or tags change, or a changelog post goes live or stops being live (after the change commits).
 type Cache struct {
 	app    core.App
 	mu     sync.Mutex
@@ -96,6 +103,19 @@ func NewCache(app core.App) *Cache {
 	app.OnRecordAfterCreateSuccess("settings", "boards", "tags").BindFunc(drop)
 	app.OnRecordAfterUpdateSuccess("settings", "boards", "tags").BindFunc(drop)
 	app.OnRecordAfterDeleteSuccess("settings", "boards", "tags").BindFunc(drop)
+	// Not on every changelog save: autosave writes about once a second while someone types.
+	app.OnRecordAfterUpdateSuccess("changelogs").BindFunc(func(e *core.RecordEvent) error {
+		if e.Record.GetString("state") != e.Record.Original().GetString("state") {
+			c.Invalidate()
+		}
+		return e.Next()
+	})
+	app.OnRecordAfterDeleteSuccess("changelogs").BindFunc(func(e *core.RecordEvent) error {
+		if e.Record.GetString("state") == "published" {
+			c.Invalidate()
+		}
+		return e.Next()
+	})
 	return c
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/hacker4ofakind/lort/server/internal/api"
+	"github.com/hacker4ofakind/lort/server/internal/changelog"
 	"github.com/hacker4ofakind/lort/server/internal/config"
 	"github.com/hacker4ofakind/lort/server/internal/hooks"
 	"github.com/hacker4ofakind/lort/server/internal/proxytrust"
@@ -107,7 +108,14 @@ func explainBootstrap(err error) error {
 func register(app core.App, cfg config.Config) {
 	svc := requests.New(app)
 	hooks.Register(app, svc)
+	changelog.Bind(app)
 	siteCfg := site.NewCache(app)
+	posts := changelog.New(app)
+	posts.BaseURL = cfg.URL
+	posts.AppName = func() string {
+		c, _ := siteCfg.Get()
+		return c.AppName
+	}
 
 	webURL, err := url.Parse(cfg.WebURL)
 	if err != nil {
@@ -142,6 +150,10 @@ func register(app core.App, cfg config.Config) {
 				log.Printf("Couldn't recompute trending: %v", err)
 			}
 		})
+		se.App.Cron().MustAdd("lort_changelog", "* * * * *", func() { publishDue(posts.PublishDue, "") })
+		// Catch up on posts that fell due while Lort was down. In the background and logged
+		// only: one bad post must never stop Lort from starting.
+		go publishDue(posts.PublishDue, " at startup")
 
 		if !cfg.PBAdmin {
 			se.Router.BindFunc(func(e *core.RequestEvent) error {
@@ -151,8 +163,8 @@ func register(app core.App, cfg config.Config) {
 				return e.Next()
 			})
 		}
-		api.Register(se, api.Deps{Svc: svc, Cfg: cfg, Site: siteCfg})
-		se.Router.Any("/{path...}", web.Proxy(webURL, siteCfg.Header, web.ProxyOptions{HSTS: cfg.TLS == "auto"}))
+		api.Register(se, api.Deps{Svc: svc, Changelog: posts, Cfg: cfg, Site: siteCfg})
+		se.Router.Any("/{path...}", web.Proxy(webURL, siteCfg.Header, web.ProxyOptions{HSTS: cfg.TLS == "auto", Page: posts.PageMeta}))
 
 		if len(cfg.WebCmd) > 0 {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -172,4 +184,11 @@ func register(app core.App, cfg config.Config) {
 		}
 		return se.Next()
 	})
+}
+
+// publishDue runs the scheduled publish and logs a failure instead of returning it.
+func publishDue(run func() error, when string) {
+	if err := run(); err != nil {
+		log.Printf("Couldn't publish scheduled changelog posts%s: %v", when, err)
+	}
 }

@@ -217,6 +217,38 @@ func (s *Service) Similar(text string, limit int) ([]Item, error) {
 	return page.Items, err
 }
 
+// ItemsByID loads requests in the order of ids, without bodies, for lists that link to them (a
+// changelog post's shipped requests). The public view (team false) keeps only requests anyone
+// could open, like the roadmap: visible, on a public board, not merged, with no exception for the
+// viewer's own hidden ones; viewer only decides which show as voted. Missing ids are skipped.
+func (s *Service) ItemsByID(ids []string, viewer *core.Record, team bool) ([]Item, error) {
+	if len(ids) == 0 {
+		return []Item{}, nil
+	}
+	keep := ids
+	if !team {
+		base, err := s.filter(Query{}, nil, false)
+		if err != nil {
+			return nil, err
+		}
+		var allowed []string
+		if err := base.Select("r.id").AndWhere(dbx.In("r.id", anys(ids)...)).Column(&allowed); err != nil {
+			return nil, err
+		}
+		ok := make(map[string]bool, len(allowed))
+		for _, id := range allowed {
+			ok[id] = true
+		}
+		keep = make([]string, 0, len(allowed))
+		for _, id := range ids {
+			if ok[id] {
+				keep = append(keep, id)
+			}
+		}
+	}
+	return s.itemsWith(keep, viewer, team, true)
+}
+
 // items loads records for ids (keeping their order) and decorates them.
 func (s *Service) items(ids []string, viewer *core.Record, team bool) ([]Item, error) {
 	return s.itemsWith(ids, viewer, team, false)

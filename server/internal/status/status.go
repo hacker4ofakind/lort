@@ -58,6 +58,16 @@ func Next(from Status, action Action) (Status, error) {
 	return to, nil
 }
 
+// Ship checks that a request in from can be marked Completed because a changelog post that
+// lists it went live: any open status, never Completed or Closed again.
+func Ship(from Status) error {
+	switch from {
+	case Pending, Reviewing, Planned, Progress:
+		return nil
+	}
+	return fmt.Errorf("a %s request can't be marked as shipped", from)
+}
+
 // OnRoadmap reports whether a status is shown on the roadmap.
 func OnRoadmap(s Status) bool {
 	return s == Planned || s == Progress || s == Completed

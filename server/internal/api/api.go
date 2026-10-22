@@ -9,8 +9,10 @@ import (
 
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/router"
 
 	"github.com/hacker4ofakind/lort/server/internal/catalog"
+	"github.com/hacker4ofakind/lort/server/internal/changelog"
 	"github.com/hacker4ofakind/lort/server/internal/config"
 	"github.com/hacker4ofakind/lort/server/internal/requests"
 	"github.com/hacker4ofakind/lort/server/internal/site"
@@ -19,9 +21,10 @@ import (
 )
 
 type Deps struct {
-	Svc  *requests.Service
-	Cfg  config.Config
-	Site *site.Cache
+	Svc       *requests.Service
+	Changelog *changelog.Service
+	Cfg       config.Config
+	Site      *site.Cache
 }
 
 // Register adds every /api/lort route.
@@ -57,11 +60,21 @@ func Register(se *core.ServeEvent, d Deps) {
 	team.GET("/users/{id}", d.userSummary)
 	team.POST("/users/{id}/ban", d.userBan)
 	team.POST("/users/{id}/reset-link", d.userResetLink)
+	registerChangelog(g, team, d)
 }
 
 // fail maps service errors to friendly HTTP errors.
 func fail(e *core.RequestEvent, err error) error {
+	var apiErr *router.ApiError
 	switch {
+	case errors.As(err, &apiErr): // raised by a hook, already an HTTP error
+		return apiErr
+	case errors.Is(err, changelog.ErrNotFound):
+		return e.NotFoundError(err.Error(), nil)
+	case errors.Is(err, changelog.ErrLive), errors.Is(err, changelog.ErrNotScheduled), errors.Is(err, changelog.ErrNotLive):
+		return e.Error(http.StatusConflict, err.Error(), nil)
+	case errors.Is(err, changelog.ErrNoTitle), errors.Is(err, changelog.ErrNoSlug), errors.Is(err, changelog.ErrPast):
+		return e.BadRequestError(err.Error(), nil)
 	case errors.Is(err, requests.ErrNotFound):
 		return e.NotFoundError("That request is gone.", nil)
 	case errors.Is(err, requests.ErrMoved):

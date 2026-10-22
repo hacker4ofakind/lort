@@ -181,3 +181,29 @@ func TestSuperviseStopsGracefully(t *testing.T) {
 		})
 	}
 }
+
+func TestProxySetsThePageHeaderOnlyForPostPages(t *testing.T) {
+	next := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "page="+r.Header.Get(web.PageHeader)+";")
+	}))
+	t.Cleanup(next.Close)
+	target, _ := url.Parse(next.URL)
+	app := testutil.NewApp(t)
+	page := func(path string) string {
+		if path == "/changelog/dark-mode" {
+			return "meta"
+		}
+		return ""
+	}
+	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		se.Router.Any("/{path...}", web.Proxy(target, func() string { return "" }, web.ProxyOptions{Page: page}))
+		return se.Next()
+	})
+	for path, want := range map[string]string{"/changelog/dark-mode": "page=meta;", "/changelog/draft": "page=;", "/feedback": "page=;"} {
+		(&tests.ApiScenario{
+			Method: http.MethodGet, URL: path, Headers: map[string]string{web.PageHeader: "forged"},
+			ExpectedStatus: 200, ExpectedContent: []string{want},
+			TestAppFactory: func(testing.TB) *tests.TestApp { return app }, DisableTestAppCleanup: true,
+		}).Test(t)
+	}
+}

@@ -78,3 +78,16 @@ func TestRoadmapMove(t *testing.T) {
 		}
 	}
 }
+
+func TestShip(t *testing.T) {
+	for _, s := range []Status{Pending, Reviewing, Planned, Progress} {
+		if err := Ship(s); err != nil {
+			t.Errorf("Ship(%s) = %v", s, err)
+		}
+	}
+	for _, s := range []Status{Completed, Closed, "nope"} {
+		if err := Ship(s); err == nil {
+			t.Errorf("Ship(%s) should fail", s)
+		}
+	}
+}

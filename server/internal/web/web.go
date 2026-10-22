@@ -24,6 +24,10 @@ const unavailable = `<!doctype html><meta charset="utf-8"><title>Starting up</ti
 // so a visitor can't send their own.
 const ConfigHeader = "X-Lort-Config"
 
+// PageHeader carries what a changelog post's page needs for link previews (PageMeta). The proxy
+// always removes a visitor's copy and sets it only for those pages.
+const PageHeader = "X-Lort-Page"
+
 // DefaultHeaderTimeout is how long a page may take to start answering before the visitor
 // gets the "starting up" page instead of waiting on a hung Next.
 const DefaultHeaderTimeout = 20 * time.Second
@@ -31,6 +35,8 @@ const DefaultHeaderTimeout = 20 * time.Second
 type ProxyOptions struct {
 	HeaderTimeout time.Duration // 0 means DefaultHeaderTimeout
 	HSTS          bool          // Lort terminates HTTPS itself (LORT_TLS=auto)
+	// Page returns the PageHeader value for a path, or "" for none. nil sends none.
+	Page func(path string) string
 }
 
 // Proxy returns a handler that forwards everything to target, with config() in ConfigHeader.
@@ -60,6 +66,12 @@ func Proxy(target *url.URL, config func() string, o ProxyOptions) func(*core.Req
 		e.Request.Header.Del(ConfigHeader)
 		if v := config(); v != "" {
 			e.Request.Header.Set(ConfigHeader, v)
+		}
+		e.Request.Header.Del(PageHeader)
+		if o.Page != nil {
+			if v := o.Page(e.Request.URL.Path); v != "" {
+				e.Request.Header.Set(PageHeader, v)
+			}
 		}
 		// The proxy adds Next's headers to these, so drop PocketBase's copies and let
 		// secure() set each one once.

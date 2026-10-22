@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
-import { IconAdjustments, IconInbox, IconLayoutKanban, IconLayoutSidebarLeftCollapse } from "@tabler/icons-react"
+import { IconAdjustments, IconInbox, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconNews } from "@tabler/icons-react"
 import { useConfig } from "@/app/providers"
 import { signOutAdmin } from "@/components/dashboard/session"
 import { LogoMark } from "@/components/lort/logo-mark"
@@ -29,12 +29,14 @@ import { Button } from "@/components/ui/button"
 import { stats } from "@/lib/api"
 import { useUser } from "@/lib/auth"
 import { pbAdmin } from "@/lib/pocketbase"
+import { hasLeaveGuard, mayLeave } from "@/lib/leave-guard"
 import { keys } from "@/lib/query"
 
-// Changelog joins this list in Phase 2B, Docs in Phase 6.
+// Docs joins this list in Phase 6.
 const TOP = [
   { href: "/dashboard/requests", label: "Requests", icon: IconInbox },
   { href: "/dashboard/roadmap", label: "Roadmap", icon: IconLayoutKanban },
+  { href: "/dashboard/changelog", label: "Changelog", icon: IconNews },
 ]
 const BOTTOM = [{ href: "/dashboard/settings", label: "Settings", icon: IconAdjustments }]
 
@@ -49,7 +51,21 @@ export function AppSidebar() {
 
   const item = (i: (typeof TOP)[number], badge?: number) => (
     <SidebarMenuItem key={i.href}>
-      <SidebarMenuButton isActive={pathname.startsWith(i.href)} tooltip={i.label} render={<Link href={i.href} />}>
+      <SidebarMenuButton
+        isActive={pathname.startsWith(i.href)}
+        tooltip={i.label}
+        render={
+          <Link
+            href={i.href}
+            onClick={async (e) => {
+              // A page with unsaved work (the changelog editor) gets to save it first.
+              if (!hasLeaveGuard()) return
+              e.preventDefault()
+              if (await mayLeave()) router.push(i.href)
+            }}
+          />
+        }
+      >
         <i.icon />
         <span>{i.label}</span>
       </SidebarMenuButton>

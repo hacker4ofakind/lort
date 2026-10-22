@@ -35,3 +35,33 @@ export function agoText(iso: string, now = new Date()): string {
   if (days < 365) return `${Math.floor(days / 30)} months ago`
   return "over a year ago"
 }
+
+const LONG_MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+]
+
+/** "9 October 2026", for a post's page. */
+export function longDate(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getDate()} ${LONG_MONTHS[d.getMonth()]} ${d.getFullYear()}`
+}
+
+/** "21 Oct, 09:00" (24-hour), for scheduled times in the dashboard. */
+export function dateTime(iso: string): string {
+  const d = new Date(iso)
+  const day = String(d.getDate()).padStart(2, "0")
+  const hh = String(d.getHours()).padStart(2, "0")
+  const mm = String(d.getMinutes()).padStart(2, "0")
+  return `${day} ${MONTHS[d.getMonth()]}, ${hh}:${mm}`
+}

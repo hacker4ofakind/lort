@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { expectAccessible, seedRequest, seedRoadmapRequest, setRoadmapPublic, signInAdmin, unique } from "./helpers"
+import { expectAccessible, seedPost, seedRequest, seedRoadmapRequest, setRoadmapPublic, signInAdmin, unique } from "./helpers"
 
 // axe on every 1B page, in both themes (the projects in playwright.config.ts).
 
@@ -73,4 +73,31 @@ test("the dashboard roadmap, and its card being lifted", async ({ page, request 
   await expect(page.locator("[id^=DndLiveRegion]")).toContainText("is over In progress.")
   await expectAccessible(page)
   await page.keyboard.press("Escape")
+})
+
+test("the changelog pages, public and dashboard", async ({ page, request }) => {
+  const u = unique()
+  const { slug } = await seedPost(request, { title: `Accessible post ${u}`, body: "## What changed\n\nIt is **better**.", labels: ["new"] }, true)
+  const draft = await seedPost(request, { title: `Accessible draft ${u}`, body: "Hello." })
+  await page.goto("/changelog")
+  await expect(page.getByRole("link", { name: `Accessible post ${u}` })).toBeVisible()
+  await expectAccessible(page)
+  await page.goto(`/changelog/${slug}`)
+  await expect(page.getByRole("heading", { level: 1, name: `Accessible post ${u}` })).toBeVisible()
+  await expectAccessible(page)
+  await page.goto("/changelog/not-a-post")
+  await expect(page.getByText("This post isn't here")).toBeVisible()
+  await expectAccessible(page)
+
+  await signInAdmin(page)
+  await page.goto("/dashboard/changelog")
+  await expect(page.getByRole("link", { name: `Accessible draft ${u}` })).toBeVisible()
+  await expectAccessible(page)
+  await page.goto(`/dashboard/changelog/${draft.id}`)
+  await expect(page.getByRole("textbox", { name: "Title" })).toHaveValue(`Accessible draft ${u}`)
+  await expectAccessible(page)
+  await page.getByRole("button", { name: "Publish", exact: true }).click()
+  await page.getByRole("button", { name: /Schedule…/ }).click()
+  await expect(page.getByLabel("At", { exact: true })).toBeVisible()
+  await expectAccessible(page)
 })

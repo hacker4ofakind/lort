@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -165,5 +166,15 @@ func TestHealthcheckFailsWhenTheBodyNeverFinishes(t *testing.T) {
 	defer ok.Close()
 	if err := checkHealth(&http.Client{Timeout: time.Second}, ok.URL); err != nil {
 		t.Errorf("healthy server: %v", err)
+	}
+}
+
+func TestPublishDueOnlyLogsFailures(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	publishDue(func() error { return errors.New("database is locked") }, " at startup")
+	if !strings.Contains(buf.String(), "Couldn't publish scheduled changelog posts at startup: database is locked") {
+		t.Fatalf("log = %q", buf.String())
 	}
 }

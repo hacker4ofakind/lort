@@ -4,5 +4,6 @@ import { afterEach } from "vitest"
 
 afterEach(() => {
   cleanup()
-  localStorage.clear()
+  // Node-environment tests (the share card) have no working localStorage.
+  if (typeof globalThis.localStorage?.clear === "function") localStorage.clear()
 })

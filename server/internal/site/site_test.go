@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase/core"
+
 	"github.com/hacker4ofakind/lort/server/internal/site"
 	"github.com/hacker4ofakind/lort/server/internal/testutil"
 )
@@ -44,4 +47,67 @@ func TestHeaderCarriesBrandAndRefreshesOnChange(t *testing.T) {
 	if got := decode(t, cache.Header()).AppName; got != "Driftnote ✨" {
 		t.Errorf("after rename appName = %q", got)
 	}
+}
+
+func TestChangelogFlagFollowsPublishedPosts(t *testing.T) {
+	app := testutil.NewApp(t)
+	cache := site.NewCache(app)
+	c, err := app.FindCollectionByNameOrId("changelogs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	post := core.NewRecord(c)
+	post.Set("title", "Dark mode")
+	post.Set("state", "draft")
+	if err := app.Save(post); err != nil {
+		t.Fatal(err)
+	}
+	if decode(t, cache.Header()).Changelog {
+		t.Fatal("changelog = true with only a draft")
+	}
+
+	// Published behind the hooks' back: only a dropped cache would notice.
+	if _, err := app.DB().NewQuery("UPDATE changelogs SET state = 'published' WHERE id = {:id}").Bind(dbx.Params{"id": post.Id}).Execute(); err != nil {
+		t.Fatal(err)
+	}
+	// A body edit doesn't drop the cache (autosave writes about once a second).
+	edit, _ := app.FindRecordById("changelogs", post.Id)
+	edit.Set("body", "Hello")
+	if err := app.Save(edit); err != nil {
+		t.Fatal(err)
+	}
+	if decode(t, cache.Header()).Changelog {
+		t.Fatal("a body edit dropped the cache")
+	}
+
+	// A state change does.
+	setState(t, app, post.Id, "draft")
+	if decode(t, cache.Header()).Changelog {
+		t.Fatal("changelog = true after unpublishing")
+	}
+	live := setState(t, app, post.Id, "published")
+	if !decode(t, cache.Header()).Changelog {
+		t.Fatal("changelog = false after publishing")
+	}
+
+	// So does deleting a published post.
+	if err := app.Delete(live); err != nil {
+		t.Fatal(err)
+	}
+	if decode(t, cache.Header()).Changelog {
+		t.Fatal("changelog = true after the published post was deleted")
+	}
+}
+
+func setState(t *testing.T, app core.App, id, state string) *core.Record {
+	t.Helper()
+	r, err := app.FindRecordById("changelogs", id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Set("state", state)
+	if err := app.Save(r); err != nil {
+		t.Fatal(err)
+	}
+	return r
 }

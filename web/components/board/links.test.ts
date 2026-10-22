@@ -10,4 +10,12 @@ describe("boardNav", () => {
     ])
     expect(boardNav({ ...DEFAULT_CONFIG, roadmapPublic: false })).toEqual([{ href: "/feedback", label: "Feedback" }])
   })
+
+  it("adds Changelog after Roadmap once a post is published", () => {
+    const labels = (c: Partial<typeof DEFAULT_CONFIG>) => boardNav({ ...DEFAULT_CONFIG, ...c }).map((l) => l.label)
+    expect(labels({ changelog: true })).toEqual(["Feedback", "Roadmap", "Changelog"])
+    expect(labels({ roadmapPublic: false, changelog: true })).toEqual(["Feedback", "Changelog"])
+    expect(labels({ changelog: false })).toEqual(["Feedback", "Roadmap"])
+    expect(boardNav({ ...DEFAULT_CONFIG, changelog: true })[2].href).toBe("/changelog")
+  })
 })

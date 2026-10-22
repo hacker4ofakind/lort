@@ -19,6 +19,8 @@ describe("parseConfig", () => {
     expect(c.primaryColor).toBe("#2563eb")
     expect(c.boards).toEqual([{ id: "b1", name: "Features" }])
     expect(c.features).toEqual(DEFAULT_CONFIG.features)
+    expect(c.changelog).toBe(false)
+    expect(parseConfig(encode({ changelog: true })).changelog).toBe(true)
   })
 
   it("falls back to the defaults without a usable header", () => {

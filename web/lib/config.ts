@@ -12,6 +12,8 @@ export interface SiteConfig {
   primaryColor: string
   showLandingCard: boolean
   roadmapPublic: boolean
+  /** At least one changelog post is published: the nav shows Changelog. */
+  changelog: boolean
   /** Public boards, in order. The first is the default for new suggestions. */
   boards: Ref[]
   tags: Ref[]
@@ -27,6 +29,7 @@ export const DEFAULT_CONFIG: SiteConfig = {
   primaryColor: "#cc3a6d",
   showLandingCard: true,
   roadmapPublic: true,
+  changelog: false,
   boards: [],
   tags: [],
   features: { email: false, voice: false, turnstile: false },

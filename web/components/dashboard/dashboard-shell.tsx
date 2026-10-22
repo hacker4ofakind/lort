@@ -4,12 +4,18 @@ import { useState } from "react"
 import { usePathname } from "next/navigation"
 import { useConfig } from "@/app/providers"
 import { AppSidebar } from "@/components/dashboard/app-sidebar"
+import { FailedBanner } from "@/components/dashboard/changelog/failed-banner"
 import { useAdminSession } from "@/components/dashboard/session"
 import { LogoMark } from "@/components/lort/logo-mark"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 
-// Pages that need the width open with the sidebar as the 76px rail, whatever it was left at.
-const DENSE_PAGES = ["/dashboard/roadmap"]
+// Pages that need the width open with the sidebar as the 76px rail, whatever it was left at:
+// the roadmap and the changelog editor (not the changelog list).
+const DENSE_PAGES = [/^\/dashboard\/roadmap/, /^\/dashboard\/changelog\/[^/]+$/]
+
+export function isDense(pathname: string): boolean {
+  return DENSE_PAGES.some((p) => p.test(pathname))
+}
 
 /**
  * Guards the dashboard (superusers only) and lays out the sidebar and the page. The sidebar's
@@ -20,7 +26,7 @@ export function DashboardShell({ defaultOpen, children }: { defaultOpen: boolean
   useAdminSession()
   const config = useConfig()
   const pathname = usePathname()
-  const dense = DENSE_PAGES.some((p) => pathname.startsWith(p))
+  const dense = isDense(pathname)
   const [remembered, setRemembered] = useState(defaultOpen)
   const [visitOpen, setVisitOpen] = useState(false)
   // Reset the per-visit state when the page changes: state derived during render, not an effect.
@@ -43,6 +49,7 @@ export function DashboardShell({ defaultOpen, children }: { defaultOpen: boolean
           <LogoMark appName={config.appName} logo={config.logo} size={26} />
           <span className="font-display text-base font-extrabold">{config.appName}</span>
         </div>
+        <FailedBanner />
         {children}
       </SidebarInset>
     </SidebarProvider>
