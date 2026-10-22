@@ -146,7 +146,9 @@ function Editor({ post }: { post: EditorPost }) {
   const config = useConfig()
   const f = useEditorForm(post)
   const body = useRef<Tiptap | null>(null)
-  const slugInput = useRef<HTMLInputElement>(null)
+  // The address field is drawn twice (top bar, and its own row on phones); focus the visible one.
+  const slugDesktop = useRef<HTMLInputElement>(null)
+  const slugPhone = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState(false)
   const [actionPending, setActionPending] = useState(false)
   const [committedSlug, setCommittedSlug] = useState("")
@@ -241,7 +243,8 @@ function Editor({ post }: { post: EditorPost }) {
     try {
       if (!(await autosave.flush())) {
         toast(NOT_SAVED)
-        if (autosave.current().fieldError.slug) slugInput.current?.focus()
+        if (autosave.current().fieldError.slug)
+          [slugDesktop.current, slugPhone.current].find((el) => el && el.offsetParent !== null)?.focus()
         return
       }
       await fn()
@@ -257,9 +260,9 @@ function Editor({ post }: { post: EditorPost }) {
     autosave.setRevision(tp.revision)
   }
 
-  const slug = (
+  const slug = (ref: React.Ref<HTMLInputElement>) => (
     <SlugField
-      ref={slugInput}
+      ref={ref}
       slug={shownSlug}
       fixed={!!server.publishedAt}
       editable={editable}
@@ -273,11 +276,11 @@ function Editor({ post }: { post: EditorPost }) {
 
   return (
     <div>
-      <div className="flex h-16 items-center gap-3 border-b border-surface-2 px-4 sm:gap-3.5 sm:px-7">
+      <div className="flex min-h-16 flex-wrap items-center gap-x-3 gap-y-2 border-b border-surface-2 px-4 py-3 sm:gap-x-3.5 sm:px-7 md:py-0">
         <BackLink />
         <SaveState autosave={autosave} />
         <span className="flex-1" />
-        <div className="w-[min(360px,32vw)] max-md:hidden">{slug}</div>
+        <div className="w-[min(360px,32vw)] max-md:hidden">{slug(slugDesktop)}</div>
         <Button variant="ghost" onClick={() => setPreview((p) => !p)} aria-pressed={preview}>
           {preview ? "Back to editing" : "Preview"}
         </Button>
@@ -350,7 +353,7 @@ function Editor({ post }: { post: EditorPost }) {
         />
       </div>
       {/* Phones: the address gets its own row. */}
-      <div className="border-b border-surface-2 px-4 py-2.5 md:hidden">{slug}</div>
+      <div className="border-b border-surface-2 px-4 py-2.5 md:hidden">{slug(slugPhone)}</div>
 
       {autosave.status === "conflict" && (
         <div role="alert" className="flex flex-wrap items-center gap-3 border-b bg-surface-2 px-4 py-3 sm:px-7">

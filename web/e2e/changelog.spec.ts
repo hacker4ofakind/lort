@@ -195,3 +195,25 @@ test("the public label filter follows the URL and Back", async ({ page, request 
   await expect(page.getByRole("link", { name: `Fixed thing ${u}` })).toBeVisible()
   await expect(page.getByRole("group", { name: "Filter by label" }).getByRole("button", { name: "Fixed" })).toHaveAttribute("aria-pressed", "true")
 })
+
+// A 1×1 PNG.
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==", "base64")
+
+test("an image from the slash menu lands in the body, selected, with its alt text field focused", async ({ page }) => {
+  await signInAdmin(page)
+  const id = await newPost(page)
+  await page.getByRole("textbox", { name: "Title" }).fill(`Image ${unique()}`)
+  await body(page).click()
+  await page.keyboard.type("/ima")
+  const chooser = page.waitForEvent("filechooser")
+  await page.keyboard.press("Enter")
+  await (await chooser).setFiles({ name: "shot.png", mimeType: "image/png", buffer: PNG })
+  await expect(body(page).locator("img")).toHaveAttribute("src", new RegExp(`^/api/files/changelogs/${id}/shot_`))
+  const alt = page.getByRole("textbox", { name: "Alt text" })
+  await expect(alt).toBeFocused()
+  await alt.fill("A tiny dot")
+  await page.waitForTimeout(1500)
+  await waitSaved(page)
+  await page.reload()
+  await expect(body(page).locator("img")).toHaveAttribute("alt", "A tiny dot")
+})

@@ -561,4 +561,12 @@ Deviations and surprises (the interfaces in the plan are otherwise as built):
 - `test/setup.ts` skips `localStorage.clear()` in node-environment tests (the share card runs under `@vitest-environment node`).
 - `go test -race` not run locally (no C compiler), as in 2A.
 
+Manual verification (scripted with Playwright against the e2e stack, dark theme; MV-30 by restarting the Go server on a backdated SQLite file): every item passes after three fixes it turned up:
+- An image from the slash menu uploaded but was never inserted: selecting it at the recorded position threw once it replaced the empty paragraph. It is now inserted, then found by its address and selected (new e2e test).
+- The alt text field didn't take focus after an upload (Tiptap's deferred focus took it back); it now retries briefly.
+- After a refused address, Publish couldn't return focus to the field: the address field is drawn twice (top bar, phone row) and shared one ref. Each has its own now.
+- The editor's top bar overflowed a 375px screen; it wraps on phones.
+- MV-2 expected an abandoned "Untitled post" row in the list, which contradicts the later decision (MV-29) to delete untouched drafts; MV-29's behaviour is what ships.
+- MV-23 (earlier phases) is the full e2e suite, which passes.
+
 For the next stage: Phase 3's email hooks into `changelog.Service.publish` (one path for Publish and the cron) and `requests.Service.Ship`. `lastEmailedAt` exists but is never written. Real-device touch selection in Tiptap and the share card's look are `[user-only]`.

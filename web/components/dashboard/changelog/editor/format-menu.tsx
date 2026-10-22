@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useEditorState, type Editor } from "@tiptap/react"
 import { BubbleMenu } from "@tiptap/react/menus"
 import { IconBold, IconItalic, IconLink } from "@tabler/icons-react"
@@ -58,6 +58,22 @@ export function FormatMenu({
   }
 
   const openLink = () => onLinkOpenChange(true)
+
+  // After an upload the alt field takes focus. Tiptap's own focus() lands a frame later, so
+  // this waits a moment rather than relying on autoFocus.
+  const altInput = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!altFocus) return
+    // The field mounts once the toolbar sees the selected image, and Tiptap's focus() lands a
+    // frame later still, so try for a moment until the field has focus.
+    let tries = 0
+    const t = setInterval(() => {
+      const el = altInput.current
+      if (el && document.activeElement !== el) el.focus()
+      if ((el && document.activeElement === el && tries > 2) || ++tries > 20) clearInterval(t)
+    }, 50)
+    return () => clearInterval(t)
+  }, [altFocus])
   const apply = () => {
     if (!linkAllowed(url)) {
       setError(LINK_ERROR)
@@ -87,8 +103,7 @@ export function FormatMenu({
           <label className="flex items-center gap-2 px-1.5">
             <span className="text-caption font-semibold text-muted-foreground">Alt text</span>
             <Input
-              key={altFocus}
-              autoFocus={altFocus > 0}
+              ref={altInput}
               aria-label="Alt text"
               placeholder="Describe the image for people who can't see it"
               value={s.alt}

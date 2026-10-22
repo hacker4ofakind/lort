@@ -145,13 +145,15 @@ export function BodyEditor({ postId, markdown, version, editable, onChange, uplo
     const at = insertAt.current
     try {
       const name = await latest.current.upload(file)
+      const src = postFileUrl(postId, name)
       const pos = Math.min(at, editor.state.doc.content.size)
-      editor
-        .chain()
-        .focus()
-        .insertContentAt(pos, { type: "image", attrs: { src: postFileUrl(postId, name), alt: "" } })
-        .setNodeSelection(pos)
-        .run()
+      editor.chain().focus().insertContentAt(pos, { type: "image", attrs: { src, alt: "" } }).run()
+      // The image may land elsewhere than pos (it replaces an empty paragraph), so find it.
+      let found = -1
+      editor.state.doc.descendants((n, p) => {
+        if (n.type.name === "image" && n.attrs.src === src) found = p
+      })
+      if (found >= 0) editor.commands.setNodeSelection(found)
       // Alt text is the natural next step: the toolbar's field mounts focused.
       setAltFocus((n) => n + 1)
     } catch (err) {
