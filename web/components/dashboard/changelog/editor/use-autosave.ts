@@ -65,6 +65,7 @@ export class SaveQueue {
   private paused = false
   private blocked = false // a 400 without field data: wait for the next change
   private rejected: DraftPatch = {} // fields the server refused: still unsaved, until edited or discarded
+  private rejectedMessage = "" // why, kept showing while any of them remains
   private failures = 0
   private hadError = false // the next Saved is announced
   private images: string[]
@@ -159,6 +160,7 @@ export class SaveQueue {
     clearTimeout(this.timer)
     this.pending = {}
     this.rejected = {}
+    this.rejectedMessage = ""
     for (const op of this.ops) if (op.kind !== "patch") op.reject(new Error("Discarded."))
     this.ops = []
     this.blocked = false
@@ -207,6 +209,16 @@ export class SaveQueue {
     return Object.keys(this.rejected).length > 0
   }
 
+  /**
+   * The status after a request ended without taking the queue down: busy while something is still
+   * to send, else the refused field's error (the rest saved, that one did not), else Saved.
+   */
+  private settledState(): Pick<AutosaveState, "status" | "message"> {
+    if (this.unsent()) return { status: "saving", message: "" }
+    if (this.hasRejected()) return { status: "error", message: this.rejectedMessage }
+    return { status: "saved", message: "" }
+  }
+
   close() {
     this.unsubscribeAuth?.()
   }
@@ -251,8 +263,7 @@ export class SaveQueue {
       this.images = saved.images
       this.busy = false
       // A refused field keeps its error showing: the rest saved, that one did not.
-      const status = this.unsent() ? "saving" : this.hasRejected() ? "error" : "saved"
-      this.set({ revision: saved.revision, message: this.hasRejected() ? this.state.message : "", status, uploading: this.hasFileOps() })
+      this.set({ revision: saved.revision, ...this.settledState(), uploading: this.hasFileOps() })
       this.events.onSaved?.(saved)
       if (this.unsent()) void this.run()
       else this.notifySettled()
@@ -304,8 +315,8 @@ export class SaveQueue {
 
   private fail(op: Op, err: unknown) {
     if ((err as { handled?: boolean }).handled) {
-      this.set({ status: this.dirty() ? "saving" : "saved", uploading: this.hasFileOps() })
-      if (this.dirty()) this.schedule(0)
+      this.set({ ...this.settledState(), uploading: this.hasFileOps() })
+      if (this.unsent()) this.schedule(0)
       return
     }
     const code = statusOf(err)
@@ -328,8 +339,9 @@ export class SaveQueue {
       if (op.kind !== "patch") {
         // A file the server won't take: tell the caller, keep going with the rest.
         op.reject(new Error(message))
-        this.set({ status: this.dirty() ? "saving" : "error", message, uploading: this.hasFileOps() })
-        if (this.dirty()) this.schedule(0)
+        const settled = this.settledState()
+        this.set({ ...(settled.status === "saved" ? { status: "error" as const, message } : settled), uploading: this.hasFileOps() })
+        if (this.unsent()) this.schedule(0)
         return
       }
       if (message === LIVE) {
@@ -347,7 +359,10 @@ export class SaveQueue {
           // The address has its own error under its field; any other refused field is kept as
           // unsaved work, so flush() and the leave prompt know about it. A newer edit replaces it.
           if (n === "slug") fieldError.slug = fields[n]?.message ?? message
-          else if (!(key in this.pending)) this.rejected = { ...this.rejected, [key]: op.patch[key] }
+          else if (!(key in this.pending)) {
+            this.rejected = { ...this.rejected, [key]: op.patch[key] }
+            this.rejectedMessage = message
+          }
           delete rest[key]
         }
         this.pending = { ...rest, ...this.pending }

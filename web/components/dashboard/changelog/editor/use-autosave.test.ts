@@ -267,6 +267,56 @@ describe("useAutosave: uploads", () => {
     await expect(up).resolves.toBe("new.png")
     expect(removeImages).toHaveBeenCalledWith(["i29.png"], 0)
   })
+  describe("while the server has refused the body", () => {
+    const TOO_LONG = "Must be no more than 100000 character(s)."
+    const refuseBody = async (result: { current: ReturnType<typeof useAutosave> }) => {
+      updateDraft.mockRejectedValueOnce(fail(400, { body: { message: TOO_LONG } }))
+      act(() => result.current.save({ body: "way too long" }, { now: true }))
+      await tick(10)
+      expect(result.current.status).toBe("error")
+    }
+
+    it("keeps the error showing when an image upload is refused too", async () => {
+      addImage.mockRejectedValueOnce(fail(413, {}, "Too big."))
+      const { result } = setup()
+      await refuseBody(result)
+      let up: Promise<string> | undefined
+      act(() => {
+        up = result.current.upload(new File(["x"], "x.png"))
+        up.catch(() => undefined)
+      })
+      await tick(10)
+      await expect(up).rejects.toThrow("Too big.")
+      expect(result.current.status).toBe("error")
+      expect(result.current.message).toBe(TOO_LONG)
+      expect(result.current.uploading).toBe(false)
+    })
+
+    it("keeps the error showing when a full post can't take another image", async () => {
+      const names = Array.from({ length: 30 }, (_, i) => `i${i}.png`)
+      const md = names.map((n) => `![](/api/files/changelogs/p1/${n})`).join("\n")
+      const { result } = renderHook(() => useAutosave("p1", { revision: 0, images: names }, { getMarkdown: () => md }))
+      await refuseBody(result)
+      let up: Promise<string> | undefined
+      act(() => {
+        up = result.current.upload(new File(["x"], "new.png"))
+        up.catch(() => undefined)
+      })
+      await tick(10)
+      await expect(up).rejects.toThrow("A post can hold 30 images.")
+      expect(result.current.status).toBe("error")
+      expect(result.current.message).toBe(TOO_LONG)
+      expect(result.current.dirty()).toBe(true)
+    })
+
+    it("still shows Saved once the refused body is fixed", async () => {
+      const { result } = setup()
+      await refuseBody(result)
+      act(() => result.current.save({ body: "short" }, { now: true }))
+      await tick(10)
+      expect(result.current.status).toBe("saved")
+    })
+  })
 })
 
 describe("useAutosave: flush, unmount and discard", () => {
