@@ -75,37 +75,46 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r-surface-2">
-      <SidebarHeader className="flex-row items-center gap-2.5 px-5 pt-5 pb-[18px] group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:px-2">
+      {/* Everything here follows the target state (data-target), never the delayed layout flip, and
+          nothing changes direction: the logo stays pinned top-left, the toggle slides from beside it
+          to below it, so the end of a collapse has nothing left to snap. */}
+      <SidebarHeader className="relative h-[68px] flex-row items-start gap-2.5 pt-5 pr-5 pb-[18px] pl-5 transition-[height,padding] duration-200 ease-linear group-data-[target=icon]:h-[106px] group-data-[target=icon]:pl-[23px]">
         <LogoMark appName={config.appName} logo={config.logo} size={30} />
-        <span className="flex-1 truncate font-display text-[17px] font-extrabold group-data-[collapsible=icon]:hidden">
+        <span className="flex-1 truncate font-display text-[17px] leading-[30px] font-extrabold transition-opacity duration-150 group-data-[target=icon]:opacity-0">
           {config.appName}
         </span>
-        <Button variant="ghost" size="icon-sm" aria-label={state === "collapsed" ? "Expand sidebar" : "Collapse sidebar"} onClick={toggleSidebar} className="max-md:hidden">
-          <IconLayoutSidebarLeftCollapse className="size-[18px] group-data-[collapsible=icon]:rotate-180" />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={state === "collapsed" ? "Expand sidebar" : "Collapse sidebar"}
+          onClick={toggleSidebar}
+          className="absolute top-[21px] right-5 transition-[top,right] duration-200 ease-linear group-data-[target=icon]:top-[60px] group-data-[target=icon]:right-6 max-md:hidden"
+        >
+          <IconLayoutSidebarLeftCollapse className="size-[18px] transition-transform duration-200 ease-linear group-data-[target=icon]:rotate-180" />
         </Button>
       </SidebarHeader>
       <SidebarContent className="px-3">
-        <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">
+        <SidebarMenu className="gap-1">
           {TOP.map((i) => item(i, i.label === "Requests" ? counts.data?.new : undefined))}
         </SidebarMenu>
         <div className="flex-1" />
-        <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">{BOTTOM.map((i) => item(i))}</SidebarMenu>
+        <SidebarMenu className="gap-1">{BOTTOM.map((i) => item(i))}</SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="px-5 pt-3 pb-4 group-data-[collapsible=icon]:px-2">
+      <SidebarFooter className="px-5 pt-3 pb-4 transition-[padding] duration-200 ease-linear group-data-[target=icon]:px-6">
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
               <button
                 type="button"
-                className="flex items-center gap-2.5 rounded-full text-left group-data-[collapsible=icon]:justify-center"
+                className="flex items-center gap-2.5 rounded-full text-left"
               />
             }
           >
             {/* Named by its content, not an aria-label: the visible text (and the avatar's
                 initial) must be part of the name (WCAG 2.5.3). The spaces keep the words apart. */}
             <PersonAvatar person={{ id: profile?.id ?? "", name: profile?.name ?? "", avatar: profile?.avatar, team: true }} size={28} />{" "}
-            <span className="flex-1 truncate text-caption font-semibold group-data-[collapsible=icon]:hidden">{profile?.name}</span>{" "}
-            <span className="text-micro font-normal text-muted-foreground group-data-[collapsible=icon]:hidden">Lort {config.version}</span>
+            <span className="flex-1 truncate text-caption font-semibold transition-opacity duration-150 group-data-[target=icon]:opacity-0 group-data-[collapsible=icon]:hidden">{profile?.name}</span>{" "}
+            <span className="text-micro font-normal text-muted-foreground transition-opacity duration-150 group-data-[target=icon]:opacity-0 group-data-[collapsible=icon]:hidden">Lort {config.version}</span>
             <span className="sr-only">, your account</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="min-w-52">
