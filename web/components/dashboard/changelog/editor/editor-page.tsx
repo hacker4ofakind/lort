@@ -171,6 +171,13 @@ function Editor({ post }: { post: EditorPost }) {
     autosave.reset(fresh.revision, fresh.images)
   }
 
+  // Completing requests on publish changes what the request views cache: lists, the roadmap,
+  // details, queues and the counts. router.refresh() keeps the QueryClient, so they'd stay stale.
+  const refreshRequests = () =>
+    Promise.all(
+      [["requests"], ["request"], ["queue"], keys.stats].map((queryKey) => qc.invalidateQueries({ queryKey }))
+    )
+
   const afterAction = () => {
     void qc.invalidateQueries({ queryKey: ["changelogs"] })
     void qc.invalidateQueries({ queryKey: ["changelog"] })
@@ -205,17 +212,23 @@ function Editor({ post }: { post: EditorPost }) {
   )
 
   // A draft opened and left untouched cleans itself up, quietly, even as the tab closes.
-  const latest = useRef({ form: f.form, server: f.server })
+  // The delete says which revision this window saw, and the server refuses it if the post has
+  // moved on (another window saved into it), so a stale untouched window can't remove that work.
+  const latest = useRef({ form: f.form, server: f.server, revision: autosave.revision })
   useEffect(() => {
-    latest.current = { form: f.form, server: f.server }
+    latest.current = { form: f.form, server: f.server, revision: autosave.revision }
     if (f.server?.state === "scheduled") everScheduled.current = true
   })
+  const leaving = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => {
+    // StrictMode runs this effect's cleanup and setup back to back while the editor stays mounted;
+    // a real departure doesn't set up again, so the clean-up waits a tick to tell them apart.
+    clearTimeout(leaving.current)
     const cleanUp = () => {
-      const { form, server } = latest.current
+      const { form, server, revision } = latest.current
       if (deleted.current || everScheduled.current || !form || !server || !untouched(form, server)) return
       deleted.current = true
-      void fetch(`/api/collections/changelogs/records/${id}`, {
+      void fetch(`/api/collections/changelogs/records/${id}?ifUntouched=${revision}`, {
         method: "DELETE",
         keepalive: true,
         headers: { Authorization: pbAdmin.authStore.token },
@@ -226,7 +239,7 @@ function Editor({ post }: { post: EditorPost }) {
     window.addEventListener("pagehide", cleanUp)
     return () => {
       window.removeEventListener("pagehide", cleanUp)
-      cleanUp()
+      leaving.current = setTimeout(cleanUp, 0)
     }
   }, [id, qc])
 
@@ -310,6 +323,7 @@ function Editor({ post }: { post: EditorPost }) {
                 const res = await publishPost(pbAdmin, id)
                 applyTeam(res.post)
                 const n = res.completed
+                if (n > 0) void refreshRequests()
                 toast(
                   n > 0
                     ? `Published, and ${n === 1 ? "1 request" : `${n} requests`} marked as completed.`

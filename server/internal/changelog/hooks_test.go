@@ -11,6 +11,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 	"github.com/pocketbase/pocketbase/tools/filesystem"
+	"github.com/pocketbase/pocketbase/tools/hook"
 	"github.com/pocketbase/pocketbase/tools/router"
 
 	"github.com/hacker4ofakind/lort/server/internal/changelog"
@@ -341,6 +342,144 @@ func TestRecordAPIGuards(t *testing.T) {
 		f.scenario(t, tests.ApiScenario{Method: http.MethodGet, URL: "/api/collections/changelogs/records", Headers: h, ExpectedStatus: 403, ExpectedContent: []string{"Only superusers"}}, nil)
 		f.scenario(t, tests.ApiScenario{Method: http.MethodGet, URL: url, Headers: h, ExpectedStatus: 403, ExpectedContent: []string{"Only superusers"}}, nil)
 		f.scenario(t, tests.ApiScenario{Method: http.MethodPatch, URL: url, Headers: h, Body: strings.NewReader(`{"title":"x"}`), ExpectedStatus: 403, ExpectedContent: []string{"Only superusers"}}, nil)
+	}
+}
+
+// raceUpdate runs other once, after the record API has loaded a post for an update and before the
+// changelog hooks see it: the window in which a second save or a lifecycle call can land.
+func (f *fixture) raceUpdate(other func()) {
+	f.app.OnRecordUpdateRequest("changelogs").Bind(&hook.Handler[*core.RecordRequestEvent]{
+		Id: "race", Priority: -100,
+		Func: func(e *core.RecordRequestEvent) error {
+			f.app.OnRecordUpdateRequest("changelogs").Unbind("race")
+			other()
+			return e.Next()
+		},
+	})
+}
+
+func TestExpectedRevisionIsCheckedAgainstTheStoredPost(t *testing.T) {
+	f := newFixture(t)
+	p := f.post(t, map[string]any{"title": "Dark mode"})
+	// Another window's save lands after this one was read, so both carry revision 0.
+	f.raceUpdate(func() {
+		if _, err := f.set(t, p, map[string]any{"body": "theirs"}); err != nil {
+			t.Error(err)
+		}
+	})
+	f.scenario(t, tests.ApiScenario{
+		Method: http.MethodPatch, URL: "/api/collections/changelogs/records/" + p.Id, Headers: f.su(t),
+		Body: strings.NewReader(`{"body":"mine","expectedRevision":0}`), ExpectedStatus: 409,
+		ExpectedContent: []string{"This post changed in another window. Reload to see it."},
+	}, func(t *testing.T) {
+		if got := f.reload(t, p).GetString("body"); got != "theirs" {
+			t.Errorf("body = %q, the newer save was overwritten", got)
+		}
+	})
+}
+
+func TestASaveNeverUndoesAPublishThatLandedFirst(t *testing.T) {
+	f := newFixture(t)
+	url := func(p *core.Record) string { return "/api/collections/changelogs/records/" + p.Id }
+	live := func(p *core.Record) func() {
+		return func() {
+			if _, err := f.set(t, p, map[string]any{"state": "published", "publishedAt": time.Now()}); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+
+	// A content change meets a post that just went live: the live message, nothing written.
+	a := f.post(t, map[string]any{"title": "Dark mode"})
+	f.raceUpdate(live(a))
+	f.scenario(t, tests.ApiScenario{
+		Method: http.MethodPatch, URL: url(a), Headers: f.su(t),
+		Body: strings.NewReader(`{"title":"Night mode","expectedRevision":0}`), ExpectedStatus: 400,
+		ExpectedContent: []string{"This post is live. Unpublish it to make changes."},
+	}, func(t *testing.T) {
+		if got := f.reload(t, a); got.GetString("state") != "published" || got.GetString("title") != "Dark mode" {
+			t.Errorf("state=%s title=%s", got.GetString("state"), got.GetString("title"))
+		}
+	})
+
+	// A save that touches nothing locked goes through, and the post stays published.
+	b := f.post(t, map[string]any{"title": "Faster search"})
+	f.raceUpdate(live(b))
+	f.scenario(t, tests.ApiScenario{
+		Method: http.MethodPatch, URL: url(b), Headers: f.su(t),
+		Body: strings.NewReader(`{"completeAttached":true}`), ExpectedStatus: 200, ExpectedContent: []string{`"completeAttached":true`},
+	}, func(t *testing.T) {
+		got := f.reload(t, b)
+		if got.GetString("state") != "published" || got.GetDateTime("publishedAt").IsZero() || !got.GetBool("completeAttached") {
+			t.Errorf("state=%s publishedAt=%v completeAttached=%v", got.GetString("state"), got.GetDateTime("publishedAt"), got.GetBool("completeAttached"))
+		}
+	})
+}
+
+func TestDeleteChecksTheStoredState(t *testing.T) {
+	f := newFixture(t)
+	p := f.post(t, map[string]any{"title": "Dark mode", "state": "scheduled"})
+	// It was read as scheduled, then the cron (or a click) published it.
+	f.app.OnRecordDeleteRequest("changelogs").Bind(&hook.Handler[*core.RecordRequestEvent]{
+		Id: "race", Priority: -100,
+		Func: func(e *core.RecordRequestEvent) error {
+			if _, err := f.set(t, p, map[string]any{"state": "published", "publishedAt": time.Now()}); err != nil {
+				t.Error(err)
+			}
+			return e.Next()
+		},
+	})
+	f.scenario(t, tests.ApiScenario{
+		Method: http.MethodDelete, URL: "/api/collections/changelogs/records/" + p.Id, Headers: f.su(t),
+		ExpectedStatus: 400, ExpectedContent: []string{"Unpublish this post before deleting it."},
+	}, func(t *testing.T) {
+		if _, err := f.app.FindRecordById("changelogs", p.Id); err != nil {
+			t.Errorf("the live post was deleted: %v", err)
+		}
+	})
+}
+
+func TestUntouchedCleanupOnlyDeletesAnUntouchedDraftAtTheSeenRevision(t *testing.T) {
+	f := newFixture(t)
+	del := func(p *core.Record, query string, status int, content ...string) {
+		t.Helper()
+		f.scenario(t, tests.ApiScenario{
+			Name: query, Method: http.MethodDelete, URL: "/api/collections/changelogs/records/" + p.Id + query, Headers: f.su(t),
+			ExpectedStatus: status, ExpectedContent: content,
+		}, nil)
+	}
+	exists := func(p *core.Record) bool {
+		_, err := f.app.FindRecordById("changelogs", p.Id)
+		return err == nil
+	}
+
+	// Another window saved a title after this one opened the post (it saw revision 0).
+	edited := f.post(t, nil)
+	if _, err := f.set(t, edited, map[string]any{"title": "Dark mode"}); err != nil {
+		t.Fatal(err)
+	}
+	del(edited, "?ifUntouched=0", 409, "This post changed in another window. Reload to see it.")
+	if !exists(edited) {
+		t.Fatal("work saved by another window was deleted")
+	}
+
+	// Something that was scheduled is kept even at the revision this window saw.
+	scheduled := f.post(t, map[string]any{"state": "scheduled", "publishAt": time.Now().Add(time.Hour)})
+	del(scheduled, "?ifUntouched=0", 409, "This post isn't an empty draft any more.")
+	if !exists(scheduled) {
+		t.Fatal("a scheduled post was deleted")
+	}
+
+	// An untouched draft at the revision the window saw goes; so does any draft with no precondition.
+	untouched := f.post(t, nil)
+	del(untouched, "?ifUntouched=0", 204)
+	if exists(untouched) {
+		t.Fatal("the untouched draft stayed")
+	}
+	plain := f.post(t, map[string]any{"title": "Explicit delete"})
+	del(plain, "", 204)
+	if exists(plain) {
+		t.Fatal("an explicit delete was refused")
 	}
 }
 

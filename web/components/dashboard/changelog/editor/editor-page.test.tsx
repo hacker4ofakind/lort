@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { Fragment, StrictMode, type ReactNode } from "react"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { QueryClientProvider } from "@tanstack/react-query"
@@ -59,11 +59,18 @@ const post = (over: Partial<EditorPost> = {}): EditorPost => ({
   ...over,
 })
 
-function renderEditor() {
+function renderEditor({ strict = false } = {}) {
   const qc = makeQueryClient()
-  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-  return render(<EditorPage id="p1" />, { wrapper })
+  const Mode = strict ? StrictMode : Fragment
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <Mode>
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    </Mode>
+  )
+  return { qc, ...render(<EditorPage id="p1" />, { wrapper }) }
 }
+
+const DELETE_URL = "/api/collections/changelogs/records/p1?ifUntouched=0"
 
 beforeEach(() => {
   for (const f of [push, toast, editorPost, updateDraft, publishPost, deletePost, fetchMock]) f.mockReset()
@@ -116,16 +123,47 @@ describe("EditorPage", () => {
     const first = renderEditor()
     await screen.findByRole("textbox", { name: "Title" })
     first.unmount()
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/collections/changelogs/records/p1",
-      expect.objectContaining({ method: "DELETE", keepalive: true })
-    )
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(DELETE_URL, expect.objectContaining({ method: "DELETE", keepalive: true })))
 
     fetchMock.mockClear()
     const second = renderEditor()
     await userEvent.click(await screen.findByRole("button", { name: "New" }))
     second.unmount()
-    expect(fetchMock).not.toHaveBeenCalledWith("/api/collections/changelogs/records/p1", expect.anything())
+    await new Promise((r) => setTimeout(r, 20))
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("doesn't delete a new post while the editor is still open under StrictMode", async () => {
+    editorPost.mockResolvedValue(post({ title: "", slug: "", body: "" }))
+    const r = renderEditor({ strict: true })
+    await screen.findByRole("textbox", { name: "Title" })
+    await new Promise((res) => setTimeout(res, 20))
+    expect(fetchMock).not.toHaveBeenCalled()
+    r.unmount()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(DELETE_URL, expect.objectContaining({ method: "DELETE" })))
+  })
+
+  it("sends the revision it saw, so a post another window filled in is kept", async () => {
+    editorPost.mockResolvedValue(post({ title: "", slug: "", body: "", revision: 3 }))
+    const r = renderEditor()
+    await screen.findByRole("textbox", { name: "Title" })
+    r.unmount()
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/collections/changelogs/records/p1?ifUntouched=3", expect.objectContaining({ method: "DELETE" }))
+    )
+  })
+
+  it("refreshes the request caches when publishing completes requests", async () => {
+    editorPost.mockResolvedValue(post())
+    const tp = { ...post(), state: "published" as const, publishedAt: "2026-10-23T09:00:00Z" }
+    publishPost.mockResolvedValue({ post: tp, completed: 2 })
+    const { qc } = renderEditor()
+    const invalidate = vi.spyOn(qc, "invalidateQueries")
+    await userEvent.click(await screen.findByRole("button", { name: "Publish" }))
+    await userEvent.click(await screen.findByRole("button", { name: /Publish now/ }))
+    await waitFor(() => expect(publishPost).toHaveBeenCalled())
+    const keys = invalidate.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey[0])
+    expect(keys).toEqual(expect.arrayContaining(["requests", "request", "queue", "stats", "changelogs", "changelog"]))
   })
 
   it("keeps a post that was ever scheduled", async () => {
@@ -133,6 +171,7 @@ describe("EditorPage", () => {
     const r = renderEditor()
     await screen.findByRole("textbox", { name: "Title" })
     r.unmount()
-    expect(fetchMock).not.toHaveBeenCalledWith("/api/collections/changelogs/records/p1", expect.anything())
+    await new Promise((res) => setTimeout(res, 20))
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

@@ -1,7 +1,11 @@
 package changelog
 
 import (
+	"database/sql"
+	"errors"
+	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/pocketbase/dbx"
@@ -31,11 +35,16 @@ const (
 	msgDeleteLive   = "Unpublish this post before deleting it."
 	msgUseLifecycle = "Use Publish, Schedule or Unpublish to change that."
 	msgUseNewPost   = "Use New post to start one."
+	msgNotUntouched = "This post isn't an empty draft any more."
 )
 
 // expectedRevision is the edit precondition the dashboard sends with every draft save. The
 // update hook checks and consumes it; it is never stored.
 const expectedRevision = "expectedRevision"
+
+// ifUntouched is the query parameter of the dashboard's quiet clean-up of an abandoned new post:
+// delete only while the post is still an untouched draft at the revision the window last saw.
+const ifUntouched = "ifUntouched"
 
 // editable is everything the dashboard may write through the record API. It is an allowlist,
 // so fields added later are closed until they are named here. publishError may only be cleared.
@@ -69,14 +78,71 @@ func Bind(app core.App) {
 		return e.Next()
 	})
 	app.OnRecordUpdate(schema.Changelogs).BindFunc(onUpdate)
-	app.OnRecordDelete(schema.Changelogs).BindFunc(func(e *core.RecordEvent) error {
-		if e.Record.GetString("state") == Published {
-			return apis.NewBadRequestError(msgDeleteLive, nil)
+	app.OnRecordDeleteRequest(schema.Changelogs).BindFunc(onDeleteRequest)
+	app.OnRecordDelete(schema.Changelogs).BindFunc(onDelete)
+}
+
+// onDeleteRequest makes the clean-up of an abandoned new post conditional, in the same
+// transaction as the delete. A window that opened the post and was left alone must not remove
+// what another window saved in the meantime.
+func onDeleteRequest(e *core.RecordRequestEvent) error {
+	raw := e.Request.URL.Query().Get(ifUntouched)
+	if raw == "" {
+		return e.Next()
+	}
+	want, err := strconv.Atoi(raw)
+	if err != nil {
+		return apis.NewBadRequestError("Send the revision you last saw.", nil)
+	}
+	outer := e.App
+	defer func() { e.App = outer }()
+	return outer.RunInTransaction(func(txApp core.App) error {
+		e.App = txApp
+		fresh, err := txApp.FindRecordById(schema.Changelogs, e.Record.Id)
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return e.Next()
+		case err != nil:
+			return err
 		}
+		if fresh.GetInt("revision") != want {
+			return e.Error(http.StatusConflict, msgConflict, nil)
+		}
+		if fresh.GetString("state") != Draft || !fresh.GetDateTime("publishAt").IsZero() ||
+			!fresh.GetDateTime("publishedAt").IsZero() || fresh.GetString("publishError") != "" {
+			return e.Error(http.StatusConflict, msgNotUntouched, nil)
+		}
+		e.Record = fresh
 		return e.Next()
 	})
 }
 
+// onDelete checks the stored state and deletes in one transaction. The record in the event was
+// read earlier, so it can still say scheduled after the cron or a click has published the post.
+func onDelete(e *core.RecordEvent) error {
+	outer := e.App
+	defer func() { e.App = outer }()
+	return outer.RunInTransaction(func(txApp core.App) error {
+		e.App = txApp
+		fresh, err := txApp.FindRecordById(schema.Changelogs, e.Record.Id)
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return e.Next()
+		case err != nil:
+			return err
+		}
+		if fresh.GetString("state") == Published {
+			return apis.NewBadRequestError(msgDeleteLive, nil)
+		}
+		e.Record = fresh
+		return e.Next()
+	})
+}
+
+// onUpdateRequest answers the dashboard's draft saves. The record API read the post before this
+// hook runs, and a save overwrites every column, so a stale copy would undo whatever landed in
+// between: another window's edit, a publish, the cron. The checks and the save therefore run in
+// one transaction (writes are serialised), on a fresh read with the submitted fields applied.
 func onUpdateRequest(e *core.RecordRequestEvent) error {
 	info, err := e.RequestInfo()
 	if err != nil {
@@ -87,26 +153,40 @@ func onUpdateRequest(e *core.RecordRequestEvent) error {
 			return apis.NewBadRequestError(msgUseLifecycle, nil)
 		}
 	}
-	r := e.Record
-	// Sending an address pins it; sending "" hands it back to the title.
-	if v, ok := info.Body["slug"]; ok {
-		r.Set("slugCustom", cast.ToString(v) != "")
-	}
-	normalizeTitle(r)
-	// A post that went live meanwhile says so, rather than claiming a conflict.
-	if err := checkLive(e.App, r); err != nil {
-		return err
-	}
+	var want *int
 	if raw, ok := info.Body[expectedRevision]; ok {
-		want, err := cast.ToIntE(raw)
+		n, err := cast.ToIntE(raw)
 		if err != nil {
 			return apis.NewBadRequestError("Send the revision you last saw.", nil)
 		}
-		if want != r.Original().GetInt("revision") {
+		want = &n
+	}
+	outer := e.App
+	defer func() { e.App = outer }()
+	return outer.RunInTransaction(func(txApp core.App) error {
+		e.App = txApp
+		r, err := txApp.FindRecordById(schema.Changelogs, e.Record.Id)
+		if err != nil {
+			return err
+		}
+		for k, v := range info.Body {
+			r.SetIfFieldExists(k, v)
+		}
+		// Sending an address pins it; sending "" hands it back to the title.
+		if v, ok := info.Body["slug"]; ok {
+			r.Set("slugCustom", cast.ToString(v) != "")
+		}
+		normalizeTitle(r)
+		// A post that went live meanwhile says so, rather than claiming a conflict.
+		if err := checkLive(txApp, r); err != nil {
+			return err
+		}
+		if want != nil && *want != r.Original().GetInt("revision") {
 			return e.Error(409, msgConflict, nil)
 		}
-	}
-	return e.Next()
+		e.Record = r
+		return e.Next()
+	})
 }
 
 func onUpdate(e *core.RecordEvent) error {

@@ -64,6 +64,7 @@ export class SaveQueue {
   private timer: ReturnType<typeof setTimeout> | undefined
   private paused = false
   private blocked = false // a 400 without field data: wait for the next change
+  private rejected: DraftPatch = {} // fields the server refused: still unsaved, until edited or discarded
   private failures = 0
   private hadError = false // the next Saved is announced
   private images: string[]
@@ -109,6 +110,7 @@ export class SaveQueue {
 
   save(patch: DraftPatch, o: { now?: boolean } = {}) {
     this.pending = { ...this.pending, ...patch }
+    for (const k of Object.keys(patch)) delete this.rejected[k as keyof DraftPatch]
     this.blocked = false
     if ("slug" in patch && this.state.fieldError.slug) this.set({ fieldError: { ...this.state.fieldError, slug: undefined } })
     const textOnly = Object.keys(patch).every((k) => TEXT_FIELDS.has(k))
@@ -138,7 +140,8 @@ export class SaveQueue {
     let retried = false
     for (;;) {
       const s = this.state
-      if (this.paused || this.blocked || s.status === "signed-out" || s.status === "conflict" || s.fieldError.slug) return false
+      if (this.paused || this.blocked || s.status === "signed-out" || s.status === "conflict" || s.fieldError.slug || this.hasRejected())
+        return false
       if (!this.dirty()) return true
       if (s.status === "error") {
         if (retried) return false
@@ -155,6 +158,7 @@ export class SaveQueue {
   discard() {
     clearTimeout(this.timer)
     this.pending = {}
+    this.rejected = {}
     for (const op of this.ops) if (op.kind !== "patch") op.reject(new Error("Discarded."))
     this.ops = []
     this.blocked = false
@@ -189,15 +193,18 @@ export class SaveQueue {
     void this.run()
   }
 
-  /** Something isn't saved yet: pending, on its way, or stuck. */
+  /** Something isn't saved yet: pending, on its way, refused, or stuck. */
   dirty(): boolean {
-    return (
-      this.busy ||
-      this.ops.length > 0 ||
-      Object.keys(this.pending).length > 0 ||
-      this.state.status === "signed-out" ||
-      this.state.status === "conflict"
-    )
+    return this.unsent() || this.hasRejected() || this.state.status === "signed-out" || this.state.status === "conflict"
+  }
+
+  /** Something is still to be sent, or on its way. */
+  private unsent(): boolean {
+    return this.busy || this.ops.length > 0 || Object.keys(this.pending).length > 0
+  }
+
+  private hasRejected(): boolean {
+    return Object.keys(this.rejected).length > 0
   }
 
   close() {
@@ -243,9 +250,11 @@ export class SaveQueue {
       this.failures = 0
       this.images = saved.images
       this.busy = false
-      this.set({ revision: saved.revision, message: "", status: this.dirty() ? "saving" : "saved", uploading: this.hasFileOps() })
+      // A refused field keeps its error showing: the rest saved, that one did not.
+      const status = this.unsent() ? "saving" : this.hasRejected() ? "error" : "saved"
+      this.set({ revision: saved.revision, message: this.hasRejected() ? this.state.message : "", status, uploading: this.hasFileOps() })
       this.events.onSaved?.(saved)
-      if (this.dirty()) void this.run()
+      if (this.unsent()) void this.run()
       else this.notifySettled()
     } catch (err) {
       this.busy = false
@@ -329,16 +338,22 @@ export class SaveQueue {
         this.events.onLive?.()
         return
       }
-      if (names.length > 0) {
+      const refused = names.filter((n) => n in op.patch)
+      if (refused.length > 0) {
         const rest: DraftPatch = { ...op.patch }
         const fieldError = { ...this.state.fieldError }
-        for (const n of names) {
-          delete rest[n as keyof DraftPatch]
+        for (const n of refused) {
+          const key = n as keyof DraftPatch
+          // The address has its own error under its field; any other refused field is kept as
+          // unsaved work, so flush() and the leave prompt know about it. A newer edit replaces it.
           if (n === "slug") fieldError.slug = fields[n]?.message ?? message
+          else if (!(key in this.pending)) this.rejected = { ...this.rejected, [key]: op.patch[key] }
+          delete rest[key]
         }
         this.pending = { ...rest, ...this.pending }
-        this.set({ fieldError, status: Object.keys(this.pending).length ? "saving" : "error", message })
-        if (Object.keys(this.pending).length) this.schedule(0)
+        const more = Object.keys(this.pending).length > 0
+        this.set({ fieldError, status: more ? "saving" : "error", message })
+        if (more) this.schedule(0)
         return
       }
       this.requeue(op)

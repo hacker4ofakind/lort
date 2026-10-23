@@ -137,6 +137,47 @@ describe("useAutosave: errors", () => {
     expect(result.current.status).toBe("saved")
   })
 
+  it("keeps a body the server refused as unsaved work while the other fields save", async () => {
+    updateDraft.mockRejectedValueOnce(fail(400, { body: { code: "validation_max_text_constraint", message: "Must be no more than 100000 character(s)." } }))
+    const { result } = setup()
+    act(() => {
+      result.current.save({ body: "way too long" })
+      result.current.save({ title: "Dark mode" })
+    })
+    await tick(1000)
+    await tick(10)
+    expect(updateDraft).toHaveBeenLastCalledWith({ title: "Dark mode" }, 0)
+    expect(result.current.status).toBe("error")
+    expect(result.current.message).toBe("Must be no more than 100000 character(s).")
+    expect(result.current.dirty()).toBe(true)
+    let ok: boolean | undefined
+    await act(async () => {
+      ok = await result.current.flush()
+    })
+    expect(ok).toBe(false)
+
+    // Fixing the body sends it again and clears the block.
+    act(() => result.current.save({ body: "short" }))
+    await tick(1000)
+    expect(updateDraft).toHaveBeenLastCalledWith({ body: "short" }, 1)
+    expect(result.current.status).toBe("saved")
+    expect(result.current.dirty()).toBe(false)
+    await act(async () => {
+      ok = await result.current.flush()
+    })
+    expect(ok).toBe(true)
+  })
+
+  it("lets discard() drop a refused field", async () => {
+    updateDraft.mockRejectedValueOnce(fail(400, { body: { message: "Too long." } }))
+    const { result } = setup()
+    act(() => result.current.save({ body: "way too long" }, { now: true }))
+    await tick(0)
+    expect(result.current.dirty()).toBe(true)
+    act(() => result.current.discard())
+    expect(result.current.dirty()).toBe(false)
+  })
+
   it("keeps the whole patch while signed out and resends after signing in", async () => {
     updateDraft.mockRejectedValueOnce(fail(401))
     const { result } = setup()
