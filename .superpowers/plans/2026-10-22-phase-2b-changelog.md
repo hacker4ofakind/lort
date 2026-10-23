@@ -569,4 +569,6 @@ Manual verification (scripted with Playwright against the e2e stack, dark theme;
 - MV-2 expected an abandoned "Untitled post" row in the list, which contradicts the later decision (MV-29) to delete untouched drafts; MV-29's behaviour is what ships.
 - MV-23 (earlier phases) is the full e2e suite, which passes.
 
+UI polish after the owner's review: shadcn has no time picker, so `components/ui/time-picker.tsx` (24-hour hour and minute segments, arrow keys, auto-advance) replaces the native time input; the calendar spans the popover's inner width; the slash menu has no descriptions or icon tiles, normal weight, and item corners follow outer radius minus padding and border (14 - 4 - 1 = 9px); the format toolbar starts hidden; a published post's address is a disabled input with the note on a help icon's tooltip; the cover note is gone; the attach list's status icons keep their colour on hover, with spacing under the search and a left padding after its icon (`CommandInput` now has `pl-2` everywhere).
+
 For the next stage: Phase 3's email hooks into `changelog.Service.publish` (one path for Publish and the cron) and `requests.Service.Ship`. `lastEmailedAt` exists but is never written. Real-device touch selection in Tiptap and the share card's look are `[user-only]`.

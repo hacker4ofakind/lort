@@ -98,6 +98,6 @@ test("the changelog pages, public and dashboard", async ({ page, request }) => {
   await expectAccessible(page)
   await page.getByRole("button", { name: "Publish", exact: true }).click()
   await page.getByRole("button", { name: /Schedule…/ }).click()
-  await expect(page.getByLabel("At", { exact: true })).toBeVisible()
+  await expect(page.getByRole("textbox", { name: "Hour" })).toBeVisible()
   await expectAccessible(page)
 })

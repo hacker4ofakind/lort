@@ -1,7 +1,9 @@
 "use client"
 
 import { forwardRef, useState } from "react"
+import { IconHelpCircle } from "@tabler/icons-react"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cleanSlugInput, finalSlug } from "@/lib/changelog"
 import { cn } from "@/lib/utils"
 
@@ -26,17 +28,17 @@ export const SlugField = forwardRef<
   const [draft, setDraft] = useState<string | null>(null) // non-null while edited during this focus
   const value = draft ?? slug
   const errorId = "slug-error"
-  const hintId = "slug-hint"
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <InputGroup className="h-9 rounded-full">
+      {/* A disabled field takes no focus ring; the group's dimming is left to the input itself. */}
+      <InputGroup className="h-9 rounded-full has-disabled:opacity-100">
         <InputGroupAddon className="pr-0 text-caption text-muted-foreground">/changelog/</InputGroupAddon>
         <InputGroupInput
           ref={ref}
           aria-label="Post address"
           aria-invalid={!!error}
-          aria-describedby={error ? errorId : fixed ? hintId : undefined}
-          readOnly={fixed || !editable}
+          aria-describedby={error ? errorId : undefined}
+          disabled={fixed || !editable}
           value={value}
           placeholder="add-a-title-first"
           spellCheck={false}
@@ -53,17 +55,23 @@ export const SlugField = forwardRef<
             if (e.key === "Enter") e.currentTarget.blur()
           }}
         />
+        {fixed && (
+          <InputGroupAddon align="inline-end">
+            <Tooltip>
+              <TooltipTrigger
+                render={<button type="button" aria-label={FIXED_HINT} className="inline-flex rounded-full hover:text-foreground" />}
+              >
+                <IconHelpCircle className="size-4" />
+              </TooltipTrigger>
+              <TooltipContent>{FIXED_HINT}</TooltipContent>
+            </Tooltip>
+          </InputGroupAddon>
+        )}
       </InputGroup>
-      {error ? (
+      {error && (
         <p id={errorId} className="px-3 text-caption text-danger">
           {error}
         </p>
-      ) : (
-        fixed && (
-          <p id={hintId} className="px-3 text-caption text-muted-foreground">
-            {FIXED_HINT}
-          </p>
-        )
       )}
     </div>
   )

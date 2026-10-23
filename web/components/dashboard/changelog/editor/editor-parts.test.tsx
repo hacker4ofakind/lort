@@ -50,10 +50,11 @@ describe("SlugField", () => {
     expect(onCommit).toHaveBeenCalledWith("")
   })
 
-  it("is read-only once published, and shows server errors", () => {
+  it("is disabled once published, with the note on a help icon, and shows server errors", () => {
     const { rerender } = render(<SlugField slug="dark-mode" fixed editable onCommit={vi.fn()} />)
-    expect(screen.getByRole("textbox", { name: "Post address" })).toHaveAttribute("readonly")
-    expect(screen.getByText("The address is fixed once a post has been published.")).toBeInTheDocument()
+    expect(screen.getByRole("textbox", { name: "Post address" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "The address is fixed once a post has been published." })).toBeInTheDocument()
+    expect(screen.queryByText("The address is fixed once a post has been published.")).toBeNull()
     rerender(<SlugField slug="dark-mode" fixed={false} editable error="Another post already uses this address." onCommit={vi.fn()} />)
     expect(screen.getByRole("textbox", { name: "Post address" })).toHaveAccessibleDescription("Another post already uses this address.")
   })
@@ -188,15 +189,35 @@ describe("PublishMenu", () => {
     await userEvent.click(screen.getByRole("button", { name: "Publish" }))
     await userEvent.click(await screen.findByRole("button", { name: /Schedule…/ }))
     expect(screen.getByText(/Times are in your time zone/)).toBeInTheDocument()
-    const time = screen.getByLabelText("At")
-    await userEvent.clear(time)
+    const hour = screen.getByRole("textbox", { name: "Hour" })
+    const minute = screen.getByRole("textbox", { name: "Minute" })
+    expect(hour).toHaveValue("09")
+    await userEvent.clear(hour)
     expect(screen.getByRole("button", { name: /Schedule for 23 Oct/ })).toBeDisabled()
     expect(screen.getByText("Pick a time.")).toBeInTheDocument()
 
-    await userEvent.type(time, "09:00")
+    await userEvent.type(hour, "09")
+    expect(minute).toHaveFocus() // two digits move on to the minutes
     await userEvent.click(screen.getByRole("button", { name: "Schedule for 23 Oct" }))
     const at = (p.onSchedule as ReturnType<typeof vi.fn>).mock.calls[0][0] as Date
     expect([at.getDate(), at.getHours(), at.getMinutes()]).toEqual([23, 9, 0])
+  })
+
+  it("steps the time with the arrow keys, wrapping, and refuses an impossible hour", async () => {
+    renderMenu()
+    await userEvent.click(screen.getByRole("button", { name: "Publish" }))
+    await userEvent.click(await screen.findByRole("button", { name: /Schedule…/ }))
+    const hour = screen.getByRole("textbox", { name: "Hour" })
+    await userEvent.click(hour)
+    await userEvent.keyboard("{ArrowUp}")
+    expect(hour).toHaveValue("10")
+    const minute = screen.getByRole("textbox", { name: "Minute" })
+    await userEvent.click(minute)
+    await userEvent.keyboard("{ArrowDown}")
+    expect(minute).toHaveValue("59")
+    await userEvent.clear(hour)
+    await userEvent.type(hour, "25")
+    expect(screen.getByRole("button", { name: /Schedule for 23 Oct/ })).toBeDisabled()
   })
 
   it("disables a past time today", async () => {

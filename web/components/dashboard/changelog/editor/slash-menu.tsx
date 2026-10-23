@@ -10,7 +10,6 @@ import { Command, CommandItem, CommandList } from "@/components/ui/command"
 export interface Block {
   id: string
   title: string
-  hint?: string
   icon: ComponentType<{ className?: string }>
   run: (editor: Editor, range: Range, options: SlashOptions) => void
 }
@@ -24,7 +23,7 @@ const chain = (editor: Editor, range: Range) => editor.chain().focus().deleteRan
 
 /** The slash menu's blocks, in menu order. */
 export const BLOCKS: Block[] = [
-  { id: "heading", title: "Heading", hint: "A section title", icon: IconH2, run: (e, r) => chain(e, r).setNode("heading", { level: 2 }).run() },
+  { id: "heading", title: "Heading", icon: IconH2, run: (e, r) => chain(e, r).setNode("heading", { level: 2 }).run() },
   { id: "bullets", title: "Bulleted list", icon: IconList, run: (e, r) => chain(e, r).toggleBulletList().run() },
   { id: "numbers", title: "Numbered list", icon: IconListNumbers, run: (e, r) => chain(e, r).toggleOrderedList().run() },
   {
@@ -95,7 +94,8 @@ export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function Sl
       value={current.id}
       onValueChange={(v) => setActive(Math.max(0, items.findIndex((b) => b.id === v)))}
       shouldFilter={false}
-      className="w-[300px] rounded-[16px] border border-border-strong bg-surface p-1.5 shadow-float"
+      // 14px outside, 4px padding and a 1px border: the items' own corners are 14 - 4 - 1 = 9px.
+      className="w-[220px] rounded-[14px]! border border-border-strong bg-surface p-1 shadow-float"
     >
       <CommandList label="Insert a block" className="max-h-[min(360px,50vh)]">
         {items.map((b) => (
@@ -104,15 +104,10 @@ export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function Sl
             value={b.id}
             onSelect={() => command(b)}
             onMouseDown={(e) => e.preventDefault()}
-            className="h-11 gap-3 rounded-[12px] px-2.5 data-[selected=true]:bg-surface-2"
+            className="h-8 gap-2.5 rounded-[9px] px-2 text-[14px] font-normal data-[selected=true]:bg-surface-2"
           >
-            <span className="grid size-[30px] place-items-center rounded-[8px] bg-surface-2 text-ink-2 group-data-[selected=true]/command-item:bg-surface-3">
-              <b.icon className="size-4" />
-            </span>
-            <span className="flex flex-col">
-              <span className="text-[14px] font-bold">{b.title}</span>
-              {b.hint && <span className="text-[12px] text-muted-foreground">{b.hint}</span>}
-            </span>
+            <b.icon className="size-4 text-muted-foreground" />
+            {b.title}
           </CommandItem>
         ))}
       </CommandList>

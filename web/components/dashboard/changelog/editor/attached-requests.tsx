@@ -51,7 +51,7 @@ export function AttachedRequests({
             <PopoverContent align="end" className="w-[min(380px,calc(100vw-32px))] p-1.5">
               <Command shouldFilter={false}>
                 <CommandInput placeholder="Search requests" aria-label="Search requests" value={q} onValueChange={setQ} />
-                <CommandList label="Requests" className="max-h-[300px]">
+                <CommandList label="Requests" className="mt-1.5 max-h-[300px]">
                   <CommandEmpty>{results.isPending ? "Searching…" : "No requests match."}</CommandEmpty>
                   {(results.data?.items ?? []).map((r) => (
                     <CommandItem
@@ -65,7 +65,10 @@ export function AttachedRequests({
                       }}
                       className="gap-2.5"
                     >
-                      <StatusIcon status={r.status} size={14} decorative />
+                      {/* In a span, so the item's hover colour doesn't repaint the icon white. */}
+                      <span className="inline-flex">
+                        <StatusIcon status={r.status} size={14} decorative />
+                      </span>
                       <span className="sr-only">{STATUS_META[r.status].label}:</span>
                       <span className="min-w-0 flex-1 truncate">{r.title}</span>
                       {attached.has(r.id) ? (

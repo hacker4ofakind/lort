@@ -82,7 +82,7 @@ describe("EditorPage", () => {
     expect(screen.queryByRole("button", { name: "Publish" })).toBeNull()
     expect(screen.getByRole("textbox", { name: "Title" })).toHaveAttribute("readonly")
     expect(screen.queryByRole("button", { name: "More actions" })).toBeNull()
-    expect(screen.getAllByRole("textbox", { name: "Post address" })[0]).toHaveAttribute("readonly")
+    expect(screen.getAllByRole("textbox", { name: "Post address" })[0]).toBeDisabled()
   })
 
   it("stops Publish now while the last change hasn't saved", async () => {

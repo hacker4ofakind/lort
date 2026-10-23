@@ -113,8 +113,8 @@ test.describe("changelog editor", () => {
     await expect(page.getByRole("textbox", { name: "Title" })).not.toHaveAttribute("readonly")
     // The server is called when the 10-second window ends.
     await expect.poll(async () => (await request.get(`${API}/api/lort/changelog/${slug}`)).status(), { timeout: 20_000 }).toBe(404)
-    await expect(page.getByRole("textbox", { name: "Post address" }).first()).toHaveAttribute("readonly")
-    await expect(page.getByText("The address is fixed once a post has been published.").first()).toBeVisible()
+    await expect(page.getByRole("textbox", { name: "Post address" }).first()).toBeDisabled()
+    await expect(page.getByRole("button", { name: "The address is fixed once a post has been published." }).first()).toBeVisible()
 
     const visitor = await page.context().newPage()
     await visitor.goto(`/changelog/${slug}`)
@@ -138,7 +138,8 @@ test.describe("changelog editor", () => {
     await page.getByRole("button", { name: "Publish", exact: true }).click()
     await page.getByRole("button", { name: /Schedule…/ }).click()
     await page.getByRole("button", { name: new RegExp(`^${at.getDate()} ${MONTHS[at.getMonth()]} ${at.getFullYear()}`) }).click()
-    await page.getByLabel("At", { exact: true }).fill(`${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`)
+    await page.getByRole("textbox", { name: "Hour" }).fill(String(at.getHours()).padStart(2, "0"))
+    await page.getByRole("textbox", { name: "Minute" }).fill(String(at.getMinutes()).padStart(2, "0"))
     await page.getByRole("button", { name: /^Schedule for / }).click()
     await expect(page.getByText(/^Scheduled for \d{2} [A-Z][a-z]{2}, \d{2}:\d{2}\.$/)).toBeVisible()
 

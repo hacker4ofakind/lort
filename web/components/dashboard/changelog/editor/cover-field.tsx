@@ -104,7 +104,6 @@ export function CoverField({
       >
         {busy ? <Spinner className="size-6" /> : <IconPhoto className="size-6" aria-hidden />}
         Add a cover image
-        <span className="text-[12px] font-medium">Also used when the post is shared. Without one, Lort makes a card from the title.</span>
       </button>
       {picker}
     </>

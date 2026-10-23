@@ -5,7 +5,7 @@ import { IconArrowBackUp, IconArrowUp, IconCalendar, IconChevronDown } from "@ta
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
+import { TimePicker } from "@/components/ui/time-picker"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type { ChangelogState, RequestItem } from "@/lib/api"
 import { attachedToComplete, scheduleAt } from "@/lib/changelog"
@@ -128,7 +128,7 @@ export function PublishMenu(p: PublishMenuProps) {
           </span>
         </button>
         {scheduling && (
-          <div className="px-1 pt-2 pb-1">
+          <div className="px-2.5 pt-2 pb-1">
             <Calendar
               mode="single"
               required
@@ -138,19 +138,12 @@ export function PublishMenu(p: PublishMenuProps) {
               disabled={{ before: today }}
               weekStartsOn={1}
               labels={{ labelDayButton: dayLabel }}
-              className="mx-auto bg-transparent p-0 [--cell-size:--spacing(9)]"
+              // The week fills the popover's inner width, so the grid lines up with the rows around it.
+              classNames={{ root: "w-full" }}
+              className="w-full bg-transparent p-0"
             />
-            <div className="mt-3 flex items-center gap-2">
-              <label className="flex h-[38px] flex-1 items-center gap-2 rounded-full border bg-background px-3.5 text-[14px]">
-                <span className="text-muted-foreground">At</span>
-                <Input
-                  type="time"
-                  aria-label="At"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  className="h-8 border-0 bg-transparent px-0 font-bold tabular-nums shadow-none"
-                />
-              </label>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <TimePicker value={time} onChange={setTime} />
               <Button
                 size="sm"
                 disabled={!!timeProblem || p.disabled}
@@ -164,9 +157,9 @@ export function PublishMenu(p: PublishMenuProps) {
                 Schedule for {day.getDate()} {MONTHS[day.getMonth()]}
               </Button>
             </div>
-            <p className="mt-2 px-1 text-caption text-muted-foreground">Times are in your time zone ({zone}).</p>
+            <p className="mt-2 text-caption text-muted-foreground">Times are in your time zone ({zone}).</p>
             {timeProblem && (
-              <p id="schedule-problem" className="mt-1 px-1 text-caption text-danger">
+              <p id="schedule-problem" className="mt-1 text-caption text-danger">
                 {timeProblem}
               </p>
             )}

@@ -92,6 +92,8 @@ export function FormatMenu({
       editor={editor}
       options={{ placement: "top", offset: 8, flip: true, shift: { padding: 8 } }}
       shouldShow={({ editor: e, state }) => e.isEditable && (e.isActive("image") || !state.selection.empty || linkOpen)}
+      // Hidden until the plugin places it: unstyled, it would show up mid-page on first load.
+      style={{ position: "absolute", visibility: "hidden" }}
       className="z-40"
     >
       <div
