@@ -25,14 +25,13 @@ export function useSettings() {
     queryFn: () => pbAdmin.collection("settings").getFirstListItem<Settings>(""),
   })
 
-  /** Saves on change with a toast. router.refresh() re-renders the server layout, which reads the new brand from X-Lort-Config. */
-  const save = async (data: Partial<Settings> | { logo: File | null }, done = "Saved.") => {
+  /** Saves on change, silently; only a failure toasts. router.refresh() re-renders the server layout, which reads the new brand from X-Lort-Config. */
+  const save = async (data: Partial<Settings> | { logo: File | null }, _done?: string) => {
     if (!settings.data) return
     try {
       await pbAdmin.collection("settings").update(settings.data.id, data)
       await qc.invalidateQueries({ queryKey: keys.settings })
       router.refresh()
-      toast(done)
     } catch (err) {
       toast(errorMessage(err))
     }

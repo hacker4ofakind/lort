@@ -109,7 +109,6 @@ function MemberRow({ member: m, you, founder }: { member: TeamMember; you: boole
                     try {
                       await removeAdmin(pbAdmin, m.id)
                       await qc.invalidateQueries({ queryKey: keys.team })
-                      toast(`Removed ${name}.`)
                     } catch (err) {
                       toast(errorMessage(err))
                     }

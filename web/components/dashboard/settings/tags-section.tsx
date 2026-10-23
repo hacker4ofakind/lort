@@ -100,7 +100,6 @@ function TagChip({ tag: t }: { tag: Tag }) {
               try {
                 await pbAdmin.collection("tags").update(t.id, { name: name.trim() })
                 await refresh()
-                toast("Renamed the tag.")
               } catch (err) {
                 toast(errorMessage(err))
               }
@@ -117,7 +116,6 @@ function TagChip({ tag: t }: { tag: Tag }) {
                     await pbAdmin.collection("tags").delete(t.id)
                     await refresh()
                     await qc.invalidateQueries({ queryKey: ["requests"] })
-                    toast(`Deleted “${t.name}” and took it off every request.`)
                   } catch (err) {
                     toast(errorMessage(err))
                   }
@@ -157,7 +155,6 @@ function AddTag({ count }: { count: number }) {
               await refresh()
               setName("")
               setOpen(false)
-              toast("Added the tag.")
             } catch (err) {
               toast(errorMessage(err))
             }
