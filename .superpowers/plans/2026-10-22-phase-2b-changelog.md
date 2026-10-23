@@ -546,29 +546,36 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 - A Settings switch for the changelog (the pill follows published posts instead).
 
 ## Implementation Notes
-Deviations and surprises (the interfaces in the plan are otherwise as built):
-- **Font source.** google/fonts only ships the variable Bricolage TTF, so the static `BricolageGrotesque-ExtraBold.ttf` comes from the upstream repo it builds from (ateliertriay/bricolage, same OFL). `outputFileTracingIncludes` carries it into the standalone build.
-- **"New" chip colour.** `primary-text` on `primary-soft` failed axe contrast, the same limit 2A hit (`primary-text` is only guaranteed on ground and surface). The chip keeps the tint and uses ink text. The editor's pressed label toggles keep the shared Toggle style.
-- **Extra fields on the wire.** `TeamPost` carries `revision` (Publish prunes images, which bumps it, so lifecycle answers must update the editor's precondition). `EditorPost` adds `slugCustom`. `Post.cover`/`EditorPost.cover` are file names; the web builds URLs with `postFileUrl`.
-- **Draft calls.** `updateDraft`, `addImage` and `removeImages` take `expectedRevision` and all return `SavedDraft` (`slug, updated, state, images, cover, revision`), not `string[]`: the queue needs the revision from every answer.
-- **Autosave API.** Beyond the plan: `setCover(file|null): Promise<string>` (a queued op, so the dropzone can show its spinner), `reset(revision, images)` (Reload, Undo), `setRevision`, `current()` and `dirty()`. `discard()` drops what is pending but keeps the queue usable (Undo of an unpublish needs that). Status `"conflict"` is in the union as planned.
-- **Slash menu.** `@tiptap/suggestion` 3.32 positions the popup itself (`props.mount`, floating-ui, outside-click), so the menu is a cmdk `Command` in a `ReactRenderer` mounted there rather than a Base UI popover on a virtual anchor. cmdk names its listbox through `label`, not `aria-label`.
-- **Leaving the editor.** `lib/leave-guard.ts` (`setLeaveGuard`, `mayLeave`) lets the editor's back link and the sidebar links await `flush()`; when it fails, a `confirm()` asks before leaving.
-- **Writing surfaces.** The title textarea and the Tiptap body drop the global focus outline (the caret shows focus), and Enter in the title focuses the editor view synchronously: Tiptap's `focus()` waits for an animation frame.
-- **Calendar names.** react-day-picker's day names ("Thursday, October 22nd, 2026") failed axe `label-content-name-mismatch`; `dayLabel` names them "22 October 2026, today".
-- **Preview's shipped list** filters visible requests on public boards only; `RequestItem` has no merged flag, but merged requests are closed and leave the public list anyway.
-- `api.fail` passes hook `*router.ApiError`s through unchanged; the changelog errors are mapped there too.
-- `test/setup.ts` skips `localStorage.clear()` in node-environment tests (the share card runs under `@vitest-environment node`).
-- `go test -race` not run locally (no C compiler), as in 2A.
+What was built, and the choices a reviewer or the next planner needs. Interfaces not listed here are as in Tasks 1 to 7.
 
-Manual verification (scripted with Playwright against the e2e stack, dark theme; MV-30 by restarting the Go server on a backdated SQLite file): every item passes after three fixes it turned up:
-- An image from the slash menu uploaded but was never inserted: selecting it at the recorded position threw once it replaced the empty paragraph. It is now inserted, then found by its address and selected (new e2e test).
-- The alt text field didn't take focus after an upload (Tiptap's deferred focus took it back); it now retries briefly.
-- After a refused address, Publish couldn't return focus to the field: the address field is drawn twice (top bar, phone row) and shared one ref. Each has its own now.
-- The editor's top bar overflowed a 375px screen; it wraps on phones.
-- MV-2 expected an abandoned "Untitled post" row in the list, which contradicts the later decision (MV-29) to delete untouched drafts; MV-29's behaviour is what ships.
-- MV-23 (earlier phases) is the full e2e suite, which passes.
+**Server**
+- `changelogs` rules, `Slugify`, `Excerpt`, hooks, the lifecycle, the reads, the per-minute cron (with a catch-up goroutine at boot) and `PageMeta` are as in Key Decisions. `revision` is on `TeamPost`, because Publish prunes images and so bumps it: lifecycle answers must move the editor's precondition. `EditorPost` also carries `slugCustom`.
+- `api.fail` passes hook `*router.ApiError`s through unchanged and maps the changelog errors, so the changelog routes need no error mapping of their own.
+- `requests.Service.ItemsByID` reuses the roadmap's visibility filter (`filter(Query{}, nil, false)`) and returns bodies blank.
+- Test seams for the cron (`SetBetween`, `SetFailSave`) live in `export_test.go`.
+- `go test -race` is not run locally (no C compiler); CI runs it.
 
-UI polish after the owner's review: shadcn has no time picker, so `components/ui/time-picker.tsx` (24-hour hour and minute segments, arrow keys, auto-advance) replaces the native time input; the calendar spans the popover's inner width; the slash menu has no descriptions or icon tiles, normal weight, and item corners follow outer radius minus padding and border (14 - 4 - 1 = 9px); the format toolbar starts hidden; a published post's address is a disabled input with the note on a help icon's tooltip; the cover note is gone; the attach list's status icons keep their colour on hover, with spacing under the search and a left padding after its icon (`CommandInput` now has `pl-2` everywhere).
+**Web data and public pages**
+- `updateDraft`, `addImage` and `removeImages` take `expectedRevision` and return `SavedDraft` (`slug, updated, state, images, cover, revision`). `cover` is a file name on the post; URLs come from `postFileUrl`.
+- The label chip for New is `primary-soft` with ink text: `primary-text` is only guaranteed on ground and surface, not on the tint (the same limit 2A hit). The editor's pressed label toggles use the shared Toggle style.
+- The share card's font is the static `BricolageGrotesque-ExtraBold.ttf` from the upstream repo (ateliertriay/bricolage, same OFL); google/fonts only ships the variable file, which Satori can't use. `outputFileTracingIncludes` carries it into the standalone build.
+- `test/setup.ts` skips `localStorage.clear()` in node-environment tests (the share card test runs under `@vitest-environment node`).
 
-For the next stage: Phase 3's email hooks into `changelog.Service.publish` (one path for Publish and the cron) and `requests.Service.Ship`. `lastEmailedAt` exists but is never written. Real-device touch selection in Tiptap and the share card's look are `[user-only]`.
+**Editor**
+- `useAutosave` wraps `SaveQueue`, a class held in a ref. Beyond the planned API it has `setCover(file | null): Promise<string>` (a queued op, so the dropzone can show a spinner), `reset(revision, images)` (Reload, Undo), `setRevision`, `current()` and `dirty()`. `discard()` drops what is pending but leaves the queue usable. `onSaved`, `onLive` and `getMarkdown` are passed as events.
+- The slash menu is a cmdk `Command` in a `ReactRenderer` that `@tiptap/suggestion` 3.32 mounts and positions itself (`props.mount`: floating-ui, outside click). cmdk names its listbox through `label`, not `aria-label`. Blocks have a title and an icon only, in normal weight, no descriptions. Item corners are the outer radius minus padding and border (14 - 4 - 1 = 9px).
+- `lib/leave-guard.ts` (`setLeaveGuard`, `mayLeave`) lets the back link and the sidebar links await `flush()`; if it fails, a `confirm()` asks before leaving.
+- The title textarea and the Tiptap body drop the global focus outline (the caret shows focus). Enter in the title focuses the editor view synchronously, because Tiptap's `focus()` waits a frame. After an upload the alt-text field retries focus for about a second for the same reason.
+- The format toolbar (`BubbleMenu`) starts `visibility: hidden`, so it never shows before the plugin places it.
+- The address field is drawn twice (top bar, and its own row under `md`), each with its own ref; when Publish is refused over a bad address, focus goes to the visible one. A published post's address is a disabled input with the note on a help icon's tooltip (`aria-label` carries the same sentence). The top bar wraps on phones.
+- The calendar names days "22 October 2026, today" (`dayLabel`), because react-day-picker's default names fail axe's label-in-name rule. The calendar fills the publish popover's inner width.
+- Scheduling uses `components/ui/time-picker.tsx`, built in shadcn style because shadcn has none: 24-hour hour and minute segments, arrow keys step and wrap, two hour digits move on to the minutes. Its value is `"HH:MM"`, or `""` while incomplete or out of range. `CommandInput` has `pl-2` everywhere.
+- Preview's shipped list keeps visible requests on public boards; `RequestItem` has no merged flag, but merged requests are closed and leave public lists anyway.
+- The cover dropzone has no explanatory note.
+- An image from the slash menu is inserted at the recorded position, then found by its address and selected (an e2e test covers it).
+
+**Verification**
+- The Manual Verification Checklist was run with Playwright against the e2e stack (dark theme; MV-30 by restarting the Go server on a SQLite file with backdated `publishAt` values). All items pass. MV-2's "Untitled post" row only exists while an abandoned draft does, so it is checked as MV-29 describes: untouched drafts are deleted.
+- Left for a person (`[user-only]`): how the share card looks, Preview against `P-Changelog-Post`, and touch selection and typing in Tiptap on a real phone.
+
+For the next stage: Phase 3's email hooks into `changelog.Service.publish` (the one path for Publish and the cron) and `requests.Service.Ship`. `lastEmailedAt` exists but is never written. Review rounds and the docs commit still follow `CLAUDE.md`.
