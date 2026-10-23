@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
       -o /out/lort . \
  && echo "${LORT_VERSION}" > /out/built
 
-FROM node:24-trixie-slim AS web
+FROM node:25-trixie-slim AS web
 # First, so this stage starts only once the Go build has finished.
 COPY --from=server /out/built /tmp/server-built
 WORKDIR /src
@@ -35,7 +35,7 @@ RUN pnpm build \
  && cp -a .next/static /out/web/.next/static \
  && if [ -d public ]; then cp -a public /out/web/public; fi
 
-FROM node:24-trixie-slim
+FROM node:25-trixie-slim
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tini ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
