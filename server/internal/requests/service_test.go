@@ -183,3 +183,61 @@ func TestRecomputeTrendingOnlyTouchesTrendScore(t *testing.T) {
 		t.Errorf("updated %s → %s; the hourly recompute shouldn't bump it (it breaks the Recently updated sort)", before, got)
 	}
 }
+
+func TestShipCompletesOpenRequests(t *testing.T) {
+	svc, app, board, mara := setup(t)
+	admin := testutil.User(t, app, "luk@example.com")
+	r := testutil.Request(t, app, board, mara, "Dark mode", "planned", 1)
+	ch, err := svc.Ship(r.Id, admin)
+	if err != nil || ch.From != status.Planned || ch.To != status.Completed {
+		t.Fatalf("Ship = %+v, %v", ch, err)
+	}
+	rows, _ := app.FindAllRecords("activity", dbx.HashExp{"request": r.Id, "kind": "status_changed"})
+	if len(rows) != 1 || rows[0].GetString("actor") != admin.Id || rows[0].GetString("to") != "completed" {
+		t.Fatalf("activity = %v", rows)
+	}
+	closed := testutil.Request(t, app, board, mara, "Old", "closed", 1)
+	if _, err := svc.Ship(closed.Id, admin); err == nil {
+		t.Fatal("shipping a closed request should fail")
+	}
+}
+
+func TestItemsByIDKeepsOrderAndPublicView(t *testing.T) {
+	svc, app, board, mara := setup(t)
+	private := testutil.Board(t, app, "Internal", false, false)
+	a := testutil.Request(t, app, board, mara, "Alpha", "planned", 1)
+	b := testutil.Request(t, app, board, mara, "Bravo", "planned", 1)
+	hidden := testutil.Request(t, app, board, mara, "Hidden", "planned", 1)
+	hidden.Set("visible", false)
+	inside := testutil.Request(t, app, private, mara, "Inside", "planned", 1)
+	merged := testutil.Request(t, app, board, mara, "Merged", "planned", 1)
+	merged.Set("mergedInto", a.Id)
+	for _, r := range []*core.Record{hidden, merged} {
+		if err := app.Save(r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a.Set("body", "secret body")
+	if err := app.Save(a); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := svc.ToggleVote(a.Id, mara.Id); err != nil {
+		t.Fatal(err)
+	}
+	ids := []string{b.Id, hidden.Id, a.Id, inside.Id, merged.Id, "missing"}
+
+	items, err := svc.ItemsByID(ids, mara, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 || items[0].ID != b.Id || items[1].ID != a.Id || items[1].Body != "" || !items[1].Voted {
+		t.Fatalf("public items = %+v", items)
+	}
+	team, err := svc.ItemsByID(ids, nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(team) != 5 || team[1].ID != hidden.Id || team[3].ID != inside.Id {
+		t.Fatalf("team items = %d", len(team))
+	}
+}

@@ -141,3 +141,23 @@ export async function moveViaApi(request: APIRequestContext, id: string, from: s
   })
   expect(res.ok(), await res.text()).toBeTruthy()
 }
+
+/** A changelog post made through the team API: created, written through the record API, optionally published. */
+export async function seedPost(
+  request: APIRequestContext,
+  data: { title: string; body?: string; labels?: string[]; requests?: string[]; completeAttached?: boolean },
+  publish = false
+): Promise<{ id: string; slug: string }> {
+  const token = await adminToken(request)
+  const created = await request.post(`${API}/api/lort/changelogs`, { headers: { Authorization: token } })
+  expect(created.ok(), await created.text()).toBeTruthy()
+  const { id } = await created.json()
+  const saved = await request.patch(`${API}/api/collections/changelogs/records/${id}`, { headers: { Authorization: token }, data })
+  expect(saved.ok(), await saved.text()).toBeTruthy()
+  const { slug } = await saved.json()
+  if (publish) {
+    const res = await request.post(`${API}/api/lort/changelogs/${id}/publish`, { headers: { Authorization: token } })
+    expect(res.ok(), await res.text()).toBeTruthy()
+  }
+  return { id, slug }
+}

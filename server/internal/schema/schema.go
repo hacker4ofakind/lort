@@ -10,14 +10,15 @@ import (
 )
 
 const (
-	Users    = "users"
-	Boards   = "boards"
-	Tags     = "tags"
-	Requests = "requests"
-	Votes    = "votes"
-	Comments = "comments"
-	Activity = "activity"
-	Settings = "settings"
+	Users      = "users"
+	Boards     = "boards"
+	Tags       = "tags"
+	Requests   = "requests"
+	Votes      = "votes"
+	Comments   = "comments"
+	Activity   = "activity"
+	Changelogs = "changelogs"
+	Settings   = "settings"
 )
 
 const imageMax = 5 << 20
@@ -29,7 +30,7 @@ func Ensure(app core.App) error {
 	return app.RunInTransaction(func(tx core.App) error {
 		steps := []func(core.App) error{
 			ensureUsers, ensureSuperusers, ensureBoards, ensureTags, ensureRequests, ensureVotes,
-			ensureComments, ensureActivity, backfillStatusTime, ensureSettings, ensureSearch, ensureRateLimits,
+			ensureComments, ensureActivity, ensureChangelogs, backfillStatusTime, ensureSettings, ensureSearch, ensureRateLimits,
 		}
 		for _, step := range steps {
 			if err := step(tx); err != nil {
@@ -225,6 +226,44 @@ func ensureActivity(app core.App) error {
 	c.ListRule = types.Pointer("request.visible = true && request.board.isPublic = true")
 	c.ViewRule = c.ListRule
 	c.AddIndex("idx_activity_request_created", false, "request, created", "")
+	return app.Save(c)
+}
+
+// ensureChangelogs is the changelog. Every rule is nil (superusers only): the public reads go
+// through /api/lort, and the dashboard edits drafts through the record API as a superuser,
+// guarded by the changelog package's hooks. Files are not protected, so covers load for link
+// crawlers; their URLs carry the record id and a random suffix, so a draft's can't be guessed.
+func ensureChangelogs(app core.App) error {
+	c := collection(app, Changelogs)
+	add(c,
+		&core.TextField{Name: "title", Max: 160},
+		&core.TextField{Name: "slug", Max: 80},
+		&core.BoolField{Name: "slugCustom"},
+		&core.TextField{Name: "body", Max: 100000},
+		&core.TextField{Name: "excerpt", Max: 240},
+		&core.FileField{Name: "cover", MaxSelect: 1, MaxSize: imageMax, MimeTypes: imageTypes},
+		&core.FileField{Name: "images", MaxSelect: 30, MaxSize: imageMax, MimeTypes: imageTypes},
+		&core.SelectField{Name: "labels", MaxSelect: 3, Values: []string{"new", "improved", "fixed"}},
+		&core.RelationField{Name: "requests", CollectionId: id(app, Requests), MaxSelect: 50},
+		&core.SelectField{Name: "state", MaxSelect: 1, Required: true, Values: []string{"draft", "scheduled", "published"}},
+		&core.DateField{Name: "publishAt"},
+		&core.DateField{Name: "publishedAt"},
+		&core.DateField{Name: "lastEmailedAt"},
+		&core.BoolField{Name: "completeAttached"},
+		&core.RelationField{Name: "author", CollectionId: id(app, Users), MaxSelect: 1},
+		&core.RelationField{Name: "scheduledBy", CollectionId: id(app, Users), MaxSelect: 1},
+		&core.TextField{Name: "publishError", Max: 300},
+		// Rises by one on every content save, so an edit made from a stale copy is refused.
+		&core.NumberField{Name: "revision", OnlyInt: true},
+	)
+	// Display thumbs: the cover's share size, and a width-capped size for body images.
+	c.Fields.GetByName("cover").(*core.FileField).Thumbs = []string{"1200x630", "1600x0"}
+	c.Fields.GetByName("images").(*core.FileField).Thumbs = []string{"1600x0"}
+	c.ListRule, c.ViewRule, c.CreateRule, c.UpdateRule, c.DeleteRule = nil, nil, nil, nil, nil
+	// An untitled draft has no slug yet, so only real slugs must be unique.
+	c.AddIndex("idx_changelogs_slug", true, "slug", "slug != ''")
+	c.AddIndex("idx_changelogs_state_published", false, "state, publishedAt", "")
+	c.AddIndex("idx_changelogs_state_publishAt", false, "state, publishAt", "")
 	return app.Save(c)
 }
 

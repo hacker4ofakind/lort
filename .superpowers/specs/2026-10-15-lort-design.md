@@ -91,9 +91,9 @@ The Go binary starts Next, restarts it with backoff if it exits, and forwards SI
 | `/mcp` | MCP server |
 | `/widget.js` | Embeddable widget script (served by Go, cached) |
 | `/_/` | PocketBase admin UI: disabled unless `LORT_PB_ADMIN=1` |
-| everything else | Next.js, with an `X-Lort-Config` header carrying the brand |
+| everything else | Next.js, with an `X-Lort-Config` header carrying the brand, and for a published changelog post's page an `X-Lort-Page` header |
 
-Next never calls PocketBase from the server. The proxy always replaces `X-Lort-Config` on every page request (unpadded base64url JSON: app name, logo, primary colour, the landing-card and public-roadmap switches, public boards, tags, which features are on, and the version), so the root layout renders the owner's brand and favicon on the first paint and a visitor can't forge it. All data loads in the browser through the PocketBase JS SDK and TanStack Query, against the same origin, so every page renders its real shell with its own skeleton while it loads: the record API (guarded by hooks) creates requests and comments with images, and `/api/lort/*` handles everything with business rules. `GET /api/lort/requests/{id}` returns a request page in one response (request, images, merge target, timeline and comment `thread`), with visibility and internal notes decided in Go from the caller's token. The browser keeps two SDK clients: `pb` holds the board user's session (`localStorage` key `lort_user`) and `pbAdmin` the superuser's (`lort_admin`). Business rules (status transitions, vote counting, merges, email and webhook fan-out) live in Go, behind `/api/lort/*` or PocketBase hooks, never in Next.
+Next never calls PocketBase from the server. The proxy always drops an incoming `X-Lort-Page` and sets it only for `/changelog/<slug>` and `/changelog-card/<slug>` when that post is published (unpadded base64url JSON: title, excerpt, address, share image, app name), which is how a post's link previews are built. The proxy always replaces `X-Lort-Config` on every page request (unpadded base64url JSON: app name, logo, primary colour, the landing-card and public-roadmap switches, public boards, tags, which features are on, and the version), so the root layout renders the owner's brand and favicon on the first paint and a visitor can't forge it. All data loads in the browser through the PocketBase JS SDK and TanStack Query, against the same origin, so every page renders its real shell with its own skeleton while it loads: the record API (guarded by hooks) creates requests and comments with images, and `/api/lort/*` handles everything with business rules. `GET /api/lort/requests/{id}` returns a request page in one response (request, images, merge target, timeline and comment `thread`), with visibility and internal notes decided in Go from the caller's token. The browser keeps two SDK clients: `pb` holds the board user's session (`localStorage` key `lort_user`) and `pbAdmin` the superuser's (`lort_admin`). Business rules (status transitions, vote counting, merges, email and webhook fan-out) live in Go, behind `/api/lort/*` or PocketBase hooks, never in Next.
 
 ### 2.3 Repo layout
 ```
@@ -126,7 +126,7 @@ Frontend rules: `design/` is treated like a Figma file. It shows how the app loo
 | `votes` | user, request | Unique (user, request). The author's vote is created with the request, in the same transaction. Deleting a vote by any route (including a deleted account's cascade) recounts its request in the same transaction. |
 | `comments` | request, author, parent, body, images (≤3), internal | One level of replies: `parent` must be a top-level comment. Internal comments are team-only. Images are protected like request images. |
 | `activity` | request, actor, kind (status_changed, merged_in, merged_from, board_changed, created), from, to, statusSince | The request timeline. On a status change, `statusSince` is when the request entered `from`, so Undo restores that exact time (older rows fall back to the previous status entry on the timeline). Same-millisecond rows keep their insertion order. |
-| `changelogs` | title, slug, body (markdown), cover, labels (New/Improved/Fixed), requests, state (draft/scheduled/published), publishAt, publishedAt, lastEmailedAt, completeAttached | |
+| `changelogs` | title, slug, slugCustom, body (markdown), excerpt, cover, images (≤30), labels (New/Improved/Fixed), requests (≤50), state (draft/scheduled/published), publishAt, publishedAt, lastEmailedAt, completeAttached, author, scheduledBy, publishError, revision | Superusers only: every rule is nil and the public reads go through `/api/lort/changelog`. Files are not protected, so covers load for link crawlers; their URLs carry the record id and a random suffix, so a draft's can't be guessed (a file stays reachable by its URL after unpublishing). `slug` is unique when not empty. `revision` rises on every content save, and the editor sends the last one it saw, so a save from a stale window is refused with 409. The record API's update re-reads the post inside the write transaction (writes are serialised), applies the submitted fields to that fresh copy and only then checks "live" and the revision, so two overlapping saves, or a save and a publish, can't overwrite each other. Deleting checks the stored state in the delete's own transaction. `publishedAt` is set the first time only, so republishing keeps the first date. |
 | `settings` | single record: branding, roadmap, email, voice, turnstile, widget, backups, update check | Secret fields encrypted. |
 | `api_keys` | name, hash (sha256), prefix, scope (read/full), lastUsedAt, createdBy | The full key is shown once at creation. |
 | `webhooks` | url, kind (generic/discord/slack, detected), events, upvoteThreshold, secret, active | |
@@ -280,21 +280,25 @@ Three collapsible columns (Planned, In progress, Completed) with drag-and-drop b
 - **Editor:**
   - Tiptap v3 storing markdown. It autosaves (debounced 1 s) and shows "Saved".
   - There's a slash menu for heading, bulleted list, numbered list, image, quote, code and divider.
-  - The cover image dropzone notes "Also used when the post is shared. Without one, Lort makes a card from the title."
+  - The cover image dropzone says "Add a cover image". The cover is also the share image; without one, Lort draws a card from the title.
   - Label toggles: New, Improved, Fixed.
+  - A formatting toolbar over a selection: bold, italic and link (web, mail and site addresses only), and alt text for a selected image.
   - "Shipped in this update" holds the attached requests, with an "Attach a request" search.
-  - The slug field shows `/changelog/` plus the slug. It defaults to the first 6 words of the title in kebab case and can be edited while the post is a draft. It's fixed once the post has been published.
+  - The slug field shows `/changelog/` plus the slug. It defaults to the first 6 words of the title in kebab case and can be edited while the post is a draft. It's fixed once the post has been published, even after an unpublish; it's then a disabled field with the reason in a tooltip. A custom address that's invalid or taken is refused under the field. A title with no Latin letters gives no automatic address, and Publish and Schedule refuse a post without one.
   - Preview.
+  - A draft that was never touched (no title, text, cover, images, labels or requests, and never scheduled) is deleted when the editor closes. Edits that haven't saved yet are sent first, and while they can't be the editor asks before leaving. A second window's stale save is refused with a Reload option.
+  - The clean-up waits for the editor to actually go (React StrictMode's remount doesn't trigger it) and is conditional: it deletes through `DELETE /api/collections/changelogs/records/<id>?ifUntouched=<revision>`, which the server refuses with 409 unless the post is still a draft, never scheduled or published, at the revision that window last saw. Another window's work is never removed by an idle one. An explicit Delete sends no such condition.
+  - A field the server refuses (a body over 100 000 characters, say) is kept as unsaved work: its error stays in the save state, other fields keep saving, and Publish, Schedule and leaving the page stop or ask until it is edited or discarded.
 - **Publish menu:**
-  - **Publish now** says who gets emailed: "Goes live and emails N verified subscribers".
-  - **Schedule…** opens a calendar plus a time field ("Schedule for 21 Oct").
-  - The checkbox "Also mark the N attached requests as Completed when it goes live" completes them at publish time without the 60-second delay.
+  - **Publish now** says who gets emailed: "Goes live and emails N verified subscribers" (until email ships, "Goes live on the changelog straight away.").
+  - **Schedule…** opens a calendar plus a 24-hour time picker in the admin's time zone ("Schedule for 21 Oct").
+  - The checkbox "Also mark the N attached requests as Completed when it goes live" completes them at publish time without the 60-second delay. The request lists, roadmap, detail pages, queues and counts the dashboard has cached are refreshed when requests were completed.
 - **After publishing:**
   - A published post is read-only and cannot be edited.
-  - **Unpublish** moves it back to draft, where it can be edited.
+  - **Unpublish** moves it back to draft, where it can be edited. It has no confirmation: the editor looks unpublished at once and a toast with Undo counts down 10 seconds, after which the server is called (leaving earlier sends it at once). Drafts and scheduled posts can be deleted; a published one must be unpublished first.
   - Republishing only sends the email again if at least 7 days have passed since `lastEmailedAt`.
   - Scheduled posts can be unscheduled back to draft.
-- **Scheduled publish:** done by a job at `publishAt`. If it fails, the post goes back to draft and the dashboard shows a banner.
+- **Scheduled publish:** done by a per-minute cron (and once at startup) for posts whose `publishAt` has passed, oldest first. A post that can't go out because of its content (no title or address, a refused save) goes back to draft at once, with the reason in `publishError` and a dashboard banner. A passing error (a busy database) is retried every minute for 10 minutes. A post more than 72 hours overdue (after downtime or a restored backup) is not published; it goes back to draft with that reason.
 
 ### 6.5 Docs (`/dashboard/docs`)
 The `docs/` markdown rendered with a sidebar: getting started, setup script, updating and rollback, reverse proxies, email, voice, widget, MCP, webhooks (with payload reference and signature verification), backups, troubleshooting.
@@ -398,7 +402,7 @@ whisper.cpp with the q5 quantised large-v3-turbo model. The model downloads to `
   - the 60-second Complete window
   - email sends
   - webhook deliveries and retries
-  - scheduled changelog publishing
+  - scheduled changelog publishing (until this queue exists, a per-minute cron does it)
   - trending recompute (hourly)
   - the daily update check
   - nightly backups
@@ -448,7 +452,7 @@ Each phase ends with a working container.
    - The design system rebuilt in `web/` with shadcn/ui and Tailwind (2.3), plus skeletons for these pages.
 2. **Roadmap and changelog** (planned as 2A roadmap, then 2B changelog):
    - The public and dashboard roadmaps (2A, done).
-   - The changelog editor with scheduling, and the public changelog pages.
+   - The changelog editor with scheduling, and the public changelog pages (2B, done).
 3. **Email:** SMTP, templates, verification and reset, the three notification categories, unsubscribe, and Settings → Email.
 4. **Webhooks and MCP:** both features, plus API keys and their Settings sections.
 5. **Voice, widget, backups and updates:**
@@ -485,7 +489,7 @@ The full token tables and component rules are in `DESIGN.md`. This part fixes th
 - **Icons:** Tabler outline, 2px stroke; GitHub mark is Tabler `brand-github`.
 
 ### 14.4 Components
-Build each component in `web/` with shadcn/ui and Tailwind, following the frontend rules in 2.3. `design/components` and the canvases show how each one looks and behaves; match that, but never copy their code or the `lt-` CSS. Where shadcn has the component (Button, Input, Textarea, Switch, Checkbox, Badge, Tabs, Table, Dialog, Popover, DropdownMenu, Command, Calendar, Sheet, Tooltip, Avatar, Skeleton, Sonner), add it with the CLI and give it Lort's look through variants and Tailwind classes. The rules below describe the result, not the reference code.
+Build each component in `web/` with shadcn/ui and Tailwind, following the frontend rules in 2.3. `design/components` and the canvases show how each one looks and behaves; match that, but never copy their code or the `lt-` CSS. Where shadcn has the component (Button, Input, Textarea, Switch, Checkbox, Badge, Tabs, Table, Dialog, Popover, DropdownMenu, Command, Calendar, Sheet, Tooltip, Avatar, Skeleton, Sonner), add it with the CLI and give it Lort's look through variants and Tailwind classes. shadcn has no time picker, so Lort's own TimePicker (24-hour hour and minute segments) is built from its parts. The rules below describe the result, not the reference code.
 
 | Component | Rules |
 |---|---|

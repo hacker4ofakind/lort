@@ -15,7 +15,7 @@ func TestEnsureIsIdempotent(t *testing.T) {
 	if err := schema.Ensure(app); err != nil {
 		t.Fatalf("second Ensure: %v", err)
 	}
-	for _, name := range []string{"boards", "tags", "requests", "votes", "comments", "activity", "settings"} {
+	for _, name := range []string{"boards", "tags", "requests", "votes", "comments", "activity", "changelogs", "settings"} {
 		if _, err := app.FindCollectionByNameOrId(name); err != nil {
 			t.Errorf("missing collection %s", name)
 		}
@@ -111,5 +111,31 @@ func TestBackfillStatusTime(t *testing.T) {
 		if got.GetString("statusChangedAt") != got.GetString("created") {
 			t.Errorf("run %d: without history = %q, want created %q", i, got.GetString("statusChangedAt"), got.GetString("created"))
 		}
+	}
+}
+
+func TestChangelogsAreSuperuserOnlyWithUniqueRealSlugs(t *testing.T) {
+	app := testutil.NewApp(t)
+	c, err := app.FindCollectionByNameOrId(schema.Changelogs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.ListRule != nil || c.ViewRule != nil || c.CreateRule != nil || c.UpdateRule != nil || c.DeleteRule != nil {
+		t.Error("changelogs rules must all be nil")
+	}
+	insert := func(slug string) error {
+		r := core.NewRecord(c)
+		r.Set("state", "draft")
+		r.Set("slug", slug)
+		return app.SaveNoValidate(r)
+	}
+	// Untitled drafts share the empty slug; real ones are unique.
+	for _, slug := range []string{"", "", "dark-mode"} {
+		if err := insert(slug); err != nil {
+			t.Fatalf("insert %q: %v", slug, err)
+		}
+	}
+	if err := insert("dark-mode"); err == nil {
+		t.Error("a duplicate slug was saved")
 	}
 }

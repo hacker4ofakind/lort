@@ -167,6 +167,17 @@ func (s *Service) SetStatus(requestID string, action status.Action, actor *core.
 	})
 }
 
+// Ship marks an open request Completed because a changelog post that lists it went live. It is
+// a status change like any other (one timeline entry, the time stamped), with no Undo window.
+func (s *Service) Ship(requestID string, actor *core.Record) (Change, error) {
+	return s.changeStatus(requestID, actor, func(r *core.Record) (status.Status, error) {
+		if err := status.Ship(status.Status(r.GetString("status"))); err != nil {
+			return "", err
+		}
+		return status.Completed, nil
+	})
+}
+
 // changeStatus is the one place a request's status changes by a team decision: it finds the
 // request, lets decide pick the new status (and apply side effects to the record), then saves
 // and logs the change in one transaction. decide returning the status the request already has

@@ -217,3 +217,165 @@ export function setOrder(c: Client, collection: "boards" | "tags", ids: string[]
 export function deleteBoard(c: Client, id: string, moveTo = ""): Promise<void> {
   return c.send(`/api/lort/boards/${id}`, { method: "DELETE", query: moveTo ? { moveTo } : {} })
 }
+
+// Changelog
+
+export type ChangelogLabel = "new" | "improved" | "fixed"
+export type ChangelogState = "draft" | "scheduled" | "published"
+
+/** A post in the public list. */
+export interface PostSummary {
+  id: string
+  slug: string
+  title: string
+  excerpt: string
+  labels: ChangelogLabel[]
+  publishedAt: string
+}
+
+/** A published post's page. cover is a file name on the post; shipped is what anyone may see. */
+export interface Post extends PostSummary {
+  body: string
+  cover: string
+  shipped: RequestItem[]
+}
+
+/** A post in the dashboard list. revision is the edit precondition for the next draft save. */
+export interface TeamPost {
+  id: string
+  title: string
+  slug: string
+  state: ChangelogState
+  labels: ChangelogLabel[]
+  publishAt: string | null
+  publishedAt: string | null
+  updated: string | null
+  requests: number
+  author: Person
+  publishError: string
+  revision: number
+}
+
+/** Everything the editor needs; attached is in the team view (hidden and private requests too). */
+export interface EditorPost extends TeamPost {
+  body: string
+  cover: string
+  excerpt: string
+  images: string[]
+  slugCustom: boolean
+  completeAttached: boolean
+  attached: RequestItem[]
+}
+
+export interface PublishResult {
+  post: TeamPost
+  completed: number
+}
+
+export interface FailedPost {
+  id: string
+  title: string
+  publishAt: string
+  error: string
+}
+
+/** What the editor saves on a draft. File keys (images+, images-) are known to the calls below only. */
+export interface DraftPatch {
+  title?: string
+  body?: string
+  slug?: string
+  labels?: ChangelogLabel[]
+  requests?: string[]
+  completeAttached?: boolean
+  publishError?: "" // clearing only
+  cover?: File | null
+}
+
+/** What a draft save answers with: the server-owned fields the editor follows. */
+export interface SavedDraft {
+  slug: string
+  updated: string
+  state: ChangelogState
+  images: string[]
+  cover: string
+  revision: number
+}
+
+const POSTS = "changelogs"
+
+export function listPosts(c: Client, label: string, page = 1): Promise<Page<PostSummary>> {
+  return c.send("/api/lort/changelog", { query: label ? { label, page } : { page } })
+}
+
+/** A published post by its address. 404 for drafts, scheduled posts and unknown addresses. */
+export function getPost(c: Client, slug: string): Promise<Post> {
+  return c.send(`/api/lort/changelog/${encodeURIComponent(slug)}`, {})
+}
+
+export function teamPosts(c: Client, params: Record<string, string>, page = 1): Promise<Page<TeamPost>> {
+  return c.send("/api/lort/changelogs", { query: { ...params, page } })
+}
+
+export async function createPost(c: Client): Promise<string> {
+  const res = await c.send<{ id: string }>("/api/lort/changelogs", { method: "POST" })
+  return res.id
+}
+
+export function editorPost(c: Client, id: string): Promise<EditorPost> {
+  return c.send(`/api/lort/changelogs/${id}`, {})
+}
+
+export function publishPost(c: Client, id: string): Promise<PublishResult> {
+  return c.send(`/api/lort/changelogs/${id}/publish`, { method: "POST" })
+}
+
+export function schedulePost(c: Client, id: string, at: Date): Promise<TeamPost> {
+  return c.send(`/api/lort/changelogs/${id}/schedule`, json({ publishAt: at.toISOString() }))
+}
+
+export function unschedulePost(c: Client, id: string): Promise<TeamPost> {
+  return c.send(`/api/lort/changelogs/${id}/unschedule`, { method: "POST" })
+}
+
+export function unpublishPost(c: Client, id: string): Promise<TeamPost> {
+  return c.send(`/api/lort/changelogs/${id}/unpublish`, { method: "POST" })
+}
+
+export async function failedPosts(c: Client): Promise<FailedPost[]> {
+  const res = await c.send<{ items: FailedPost[] }>("/api/lort/changelogs/failed", {})
+  return res.items
+}
+
+function savedDraft(r: Record<string, unknown>): SavedDraft {
+  return {
+    slug: String(r.slug ?? ""),
+    updated: String(r.updated ?? ""),
+    state: r.state as ChangelogState,
+    images: Array.isArray(r.images) ? (r.images as string[]) : [],
+    cover: String(r.cover ?? ""),
+    revision: Number(r.revision ?? 0),
+  }
+}
+
+/**
+ * Saves draft fields through the record API. expectedRevision is the last revision this tab
+ * saw: the server answers 409 when another window saved since.
+ */
+export async function updateDraft(c: Client, id: string, patch: DraftPatch, expectedRevision: number): Promise<SavedDraft> {
+  return savedDraft(await c.collection(POSTS).update(id, { ...patch, expectedRevision }))
+}
+
+/** Uploads one body image; the answer's images list holds its new file name. */
+export async function addImage(c: Client, id: string, file: File, expectedRevision: number): Promise<SavedDraft> {
+  return savedDraft(await c.collection(POSTS).update(id, { "images+": file, expectedRevision }))
+}
+
+/** Removes body images the post no longer uses. */
+export async function removeImages(c: Client, id: string, names: string[], expectedRevision: number): Promise<SavedDraft> {
+  return savedDraft(await c.collection(POSTS).update(id, { "images-": names, expectedRevision }))
+}
+
+/** Deletes a draft or scheduled post (a published one must be unpublished first). */
+export async function deletePost(c: Client, id: string): Promise<void> {
+  await c.collection(POSTS).delete(id)
+}

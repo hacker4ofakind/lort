@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { agoText, relativeTime, shortDate } from "@/lib/time"
+import { agoText, dateTime, longDate, relativeTime, shortDate } from "@/lib/time"
 
 const now = new Date("2026-10-16T12:00:00Z")
 
@@ -37,5 +37,17 @@ describe("agoText", () => {
     expect(agoText(daysAgo(65), now)).toBe("2 months ago")
     expect(agoText(daysAgo(340), now)).toBe("11 months ago")
     expect(agoText(daysAgo(400), now)).toBe("over a year ago")
+  })
+})
+
+describe("post dates", () => {
+  // Local wall-clock times, so the expectations hold in any time zone.
+  it("writes the long date without padding", () => {
+    expect(longDate(new Date(2026, 9, 9, 12).toISOString())).toBe("9 October 2026")
+  })
+
+  it("writes a 24-hour day and time", () => {
+    expect(dateTime(new Date(2026, 9, 21, 9, 0).toISOString())).toBe("21 Oct, 09:00")
+    expect(dateTime(new Date(2026, 9, 5, 17, 45).toISOString())).toBe("05 Oct, 17:45")
   })
 })

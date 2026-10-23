@@ -303,8 +303,13 @@ Pills for everything clickable (buttons, chips, tabs, inputs, nav, floating bars
 - **InternalNote:** note-bg, 2px dashed note-border, "Only the team sees this".
 - **Avatar:** picture or initial on a warm fill picked from the name; keyline on public pages; primary ring for team members.
 - **FilterMenu:** multi-select drop-up behind a secondary button, custom checkboxes, Clear at the bottom; summary text on the trigger.
-- **Toast:** past-tense confirmation with at most one action; undo toasts draw a 60-second countdown bar in primary. 420px wide, message and actions on one row.
+- **Toast:** past-tense confirmation with at most one action; undo toasts draw a countdown bar in primary (60 seconds for a status change, 10 for an unpublish). 420px wide, message and actions on one row.
 - **Dialog:** modal radius (22px) on Card Surface with Float; its buttons sit in the dialog's own padding, with no separate footer band.
+- **LabelChip:** New is Primary Soft with ink text (primary-text is only guaranteed on ground and surface, not on the tint); Improved and Fixed are Raised Surface with ink-2. Always in the order New, Improved, Fixed. The editor's label toggles use the shared Toggle look, pressed in Primary Soft.
+- **Changelog post body:** one look for the public post, the preview and the editor (body 17/28 in ink-2, h2 in the display face 24/30 at 800, inline code on Raised Surface, 10px image corners, links in primary-text, 68ch). The title and the body in the editor drop the focus outline: the caret shows focus.
+- **SlashMenu:** a Command list in a floating panel at the caret; each block is a Tabler icon and a title in normal weight, with no descriptions. Item corners are the panel's outer radius minus its padding and border (9px inside a 14px panel).
+- **Format toolbar:** a floating role=toolbar of toggle buttons (bold, italic, link) over a text selection, or an alt-text field over a selected image. It flips and shifts to stay on screen, hidden until placed.
+- **PublishMenu and TimePicker:** the Publish button opens a popover (a dialog of plain form controls, not a menu): the address it goes live at, Publish now, and Schedule with a calendar and a 24-hour TimePicker (hour and minute segments; arrow keys step and wrap; two hour digits move to the minutes). The calendar names days in full ("22 October 2026, today") and fills the popover's width.
 
 ## Do's and Don'ts
 

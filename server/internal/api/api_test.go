@@ -10,6 +10,7 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 
 	"github.com/hacker4ofakind/lort/server/internal/api"
+	"github.com/hacker4ofakind/lort/server/internal/changelog"
 	"github.com/hacker4ofakind/lort/server/internal/config"
 	"github.com/hacker4ofakind/lort/server/internal/requests"
 	"github.com/hacker4ofakind/lort/server/internal/site"
@@ -27,8 +28,10 @@ func newFixture(t testing.TB) *fixture {
 	app := testutil.NewApp(t)
 	requests.BindStatusTime(app)
 	svc := requests.New(app)
+	changelog.Bind(app)
+	cl := changelog.New(app)
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-		api.Register(se, api.Deps{Svc: svc, Cfg: config.Config{URL: "https://f.example"}, Site: site.NewCache(app)})
+		api.Register(se, api.Deps{Svc: svc, Changelog: cl, Cfg: config.Config{URL: "https://f.example"}, Site: site.NewCache(app)})
 		return se.Next()
 	})
 	f := &fixture{app: app}
