@@ -19,7 +19,7 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 - WCAG 2.2 AA both themes, full keyboard operation (slash menu, publish menu, calendar, attach picker), 3px focus ring, `prefers-reduced-motion`.
 - Public copy speaks for "the team"; "Lort" appears on public pages only in the footer and the optional card (the generated share card carries the owner's brand, not Lort's).
 - `gofmt`, `go vet ./...`, `pnpm typecheck`, `pnpm lint`, `pnpm test` clean after every task. React 19 lint: no synchronous `setState` in effects, no ref reads during render. This machine has no C compiler: run `go test ./...` locally (CI runs `-race`).
-- Branch `phase-2b-changelog`; one commit at the end, then a PR (review rounds and the docs commit follow `CLAUDE.md`).
+- Branch `phase-2b-changelog`, PR #7: the build and its manual-checklist fixes, then one commit per review round and a final docs commit (the process in `CLAUDE.md`).
 
 ## File Map
 
@@ -65,13 +65,14 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 - **Writes split by kind.** Creating a post is `POST /api/lort/changelogs` (it sets `author` to the admin's team profile and `state=draft`). Editing a draft's `title`, `body`, `slug`, `labels`, `requests`, `completeAttached`, `publishError` (clearing only), `cover` and `images+` goes through `pbAdmin.collection("changelogs").update`. The record-API guard (`OnRecordUpdateRequest`) is an **allowlist**, so fields added in Phases 3 and 4 are closed by default. It accepts only `title`, `body`, `slug`, `labels`, `requests`, `completeAttached`, `cover`, `images`, `images+`, `images-` and `publishError`, with `publishError` only as `""`, plus the precondition key `expectedRevision` (below), which the hook consumes and never stores. Any other key gets 400 `Use Publish, Schedule or Unpublish to change that.`. A record-API create is refused (400 `Use New post to start one.`). Deletes use the record API, guarded below. `title` is trimmed and newlines become spaces on every save, in the model hook.
 - **Edit conflicts (owner's decision; replaces last-save-wins).** One admin with two tabs open could otherwise overwrite the body with a stale copy, and there's no history to recover it. Ghost's Admin API answers this with a version precondition and a 409.
   - **Why `revision`, not `updated`:** the model hook bumps `revision` by 1 on every save that changes `title`, `body`, `slug`, `labels`, `requests`, `cover`, `images` or `completeAttached`. State-only saves (publish, schedule, the cron, unpublish, a failure flipping back to draft, clearing `publishError`) leave it alone. Checking `updated` instead would flag the cron's own saves as "another window".
-  - **The check:** the record-API update hook compares `expectedRevision` with `Original().GetInt("revision")`. On a mismatch it answers 409 `This post changed in another window. Reload to see it.`. It runs **after** the "live" check, so a post the cron just published still answers `This post is live…`.
+  - **The check:** the record-API update hook runs in one transaction. The record API read the post before the hook, and a save writes every column, so the hook re-reads the post inside the transaction (writes are serialised), applies the submitted fields to that fresh copy, then runs the "live" check and compares `expectedRevision` with the stored `revision`. A mismatch answers 409 `This post changed in another window. Reload to see it.`. The live check comes first, so a post the cron just published still answers `This post is live…`, and a save that touches nothing locked can never put a published post back to draft.
   - **When it's checked:** only when the key is sent. The dashboard always sends it; the PocketBase admin UI (`LORT_PB_ADMIN=1`) and Phase 4's service calls don't.
-  - **The race:** the window between the check and the save is milliseconds, accepted for two tabs.
+  - **Overlapping requests:** the check and the save are one transaction, so two saves carrying the same revision can't both land. A save without `expectedRevision` (the PocketBase admin UI) is still last-write-wins on the fields it sends, but it never undoes a lifecycle change.
 - **Hooks return `apis.NewBadRequestError(msg, data)`** (a `*router.ApiError`), never a plain error: the record API replaces plain hook errors with a generic "Failed to update record.". Slug problems carry `data.slug` so the editor shows them under the field.
 - **Model-level rules** (`OnRecordCreate`/`OnRecordUpdate`/`OnRecordDelete` on `changelogs`, so the service, the cron and Phase 4's MCP obey them too):
   - While `Original()` is `published`, changing `title`, `body`, `slug`, `cover`, `images`, `labels` or `requests` is refused: `This post is live. Unpublish it to make changes.` State-only saves (unpublish) pass. Scheduled posts stay editable. **One exception:** a `requests` change that only removes ids whose request no longer exists passes. When a request is deleted, PocketBase strips its id from every relation and saves the referencing record with `SaveNoValidate` (`core/record_model.go:1639-1640`), and that save still runs `OnRecordUpdate`. Without the exception, deleting a request attached to a live post fails with "This post is live…".
-  - Deleting a published post is refused: `Unpublish this post before deleting it.`
+  - Deleting a published post is refused: `Unpublish this post before deleting it.`. The state is read inside the delete's own transaction, so a post the cron published after the dashboard loaded it can't be deleted.
+  - **Quiet clean-up of abandoned drafts:** `DELETE …/records/<id>?ifUntouched=<revision>` deletes only a draft that was never scheduled or published, has no `publishError` and is at that revision, checked in the delete's transaction. Otherwise 409 (`This post changed in another window. Reload to see it.` or `This post isn't an empty draft any more.`). A delete without the parameter is the explicit Delete.
   - `excerpt` is recomputed whenever `body` changes.
   - **Slug rules** (the spec's "slug generation and stability" tests): the record-API hook sets `slugCustom=true` when the body sends a non-empty `slug`, and `slugCustom=false` (back to automatic) when it sends `""`. The model hook then: refuses any slug change once `publishedAt` is set, even after an unpublish (`The address is fixed once a post has been published.`); when not custom and never published, sets `slug = unique(Slugify(title))` on every title change (`-2`, `-3`… on collision, excluding itself); refuses a custom slug that fails `ValidSlug` (`Use lowercase letters, numbers and hyphens.`) or is taken (`Another post already uses this address.`).
 - `Slugify`: NFKD, drop combining marks, lowercase, runs of anything outside `[a-z0-9]` become one separator, first 6 words joined by `-`, at most 80 characters (cut at a hyphen), empty title → `""`. `ValidSlug`: `^[a-z0-9]+(-[a-z0-9]+)*$`, ≤80. Examples to test: `"Dark mode is here, plus faster search"` → `dark-mode-is-here-plus-faster`; `"Café & crème brûlée!"` → `cafe-creme-brulee`; `"Straße"` → `strae` and `"Łódź"` → `odz` (NFKD can't split those letters, which is accepted: the owner can edit the address); `"🎉"` and `"Тёмная тема"` → `""`, so non-Latin boards set the address by hand, and publish and schedule refuse an empty slug (below).
@@ -127,7 +128,7 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 
 **Editor**
 - **Tiptap setup:** `useEditor({ immediatelyRender: false, … })` (Next SSR). Extensions: StarterKit with `heading: { levels: [2, 3] }` (the title is the h1), Image (no base64: `allowBase64: false`), Placeholder (`Type / for blocks`), Markdown, and the slash extension. Load with `contentType: "markdown"`; save `editor.getMarkdown()`. Loading content fires an update: compare the markdown with the last saved value and skip no-op saves. The content area is `role="textbox"` `aria-multiline` with `aria-label="Post body"`.
-- **Slash menu** with `@tiptap/suggestion` (`char: "/"`, `startOfLine: true`, `allowSpaces: false`): items Heading (`A section title`, inserts H2), Bulleted list, Numbered list, Image, Quote, Code (code block), Divider, filtered by the typed query. UI: shadcn `Command` in a Base UI popover anchored to a virtual element from the suggestion's `clientRect`; the suggestion's `onKeyDown` forwards ArrowUp/ArrowDown/Enter/Escape to the controlled `Command` value. Listbox `aria-label="Insert a block"`. Icons are Tabler (`h-2`, `list`, `list-numbers`, `photo`, `quote`, `code`, `separator`), not the canvas's glyphs.
+- **Slash menu** with `@tiptap/suggestion` (`char: "/"`, `startOfLine: true`, `allowSpaces: false`): items Heading (inserts H2), Bulleted list, Numbered list, Image, Quote, Code (code block), Divider, filtered by the typed query. UI: a shadcn `Command` (cmdk) that `@tiptap/suggestion` mounts and positions itself (floating-ui, outside click closes), with title and icon only, no descriptions. Its `onKeyDown` forwards ArrowUp/ArrowDown/Enter/Escape to the list. cmdk names its listbox through `label="Insert a block"`. Icons are Tabler (`h-2`, `list`, `list-numbers`, `photo`, `quote`, `code`, `separator`), not the canvas's glyphs.
 - **Images in the body:** Image opens a file picker. Check type and 5 MB on the client (toast `Images must be PNG, JPEG, WebP or GIF.` / `That image is over 5 MB.`).
   - **Each upload is its own queued request, never merged:** `upload(file): Promise<string>` on the autosave hook sends `{ "images+": file }`, diffs `images` against the value before that request, and resolves to the new filename. Insert `/api/files/changelogs/<id>/<filename>` (relative, so it works behind any host), with an empty alt, at the position recorded when the upload started. While it uploads, the save state reads `Uploading image…`.
   - **At the 30-image cap**, first remove (`images-`) the files the current markdown no longer references, then upload. Only if it's still full, toast `A post can hold 30 images.`.
@@ -145,7 +146,7 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
   - **Batching and order:** patches merge into one pending patch. Text fields (title, body) wait 1 s after the last change; labels, requests, completeAttached, slug and cover save at once. **One request in flight at a time**, in order, so an older save can never land after a newer one.
   - **Network or 5xx:** retry after 2 s, 5 s, then every 10 s, with `Couldn't save. Trying again…`.
   - **401/403 means the session expired, not bad input.** Superuser tokens last one day and the dashboard renews once per load, so a tab left open overnight hits this. Keep the whole pending patch and stop retrying. Show `You've been signed out. Sign in again to keep saving.` with a link that opens `/dashboard/login` in a new tab. Resend once `pbAdmin.authStore` changes to a valid token (it syncs across tabs through `localStorage`).
-  - **400:** drop only the fields named in `response.data` and re-queue the rest of that request ahead of newer changes, so a bad slug never takes the body down with it. A 400 without field data keeps everything and shows its message. On `This post is live…`, refetch so the editor turns read-only.
+  - **400:** drop only the fields named in `response.data` and re-queue the rest of that request ahead of newer changes, so a bad slug never takes the body down with it. A refused slug shows under its field; any other refused field (a body over 100 000 characters) is kept as unsaved work: the save state shows the server's message, `dirty()` stays true, `flush()` resolves `false` and the leave prompt appears until that field is edited again (which retries it) or `discard()`ed. Other fields keep saving, and a refused upload or a full image list doesn't turn the state back to `Saving…`. A 400 without field data keeps everything and shows its message. On `This post is live…`, refetch so the editor turns read-only.
   - **409 (edit conflict):** every request, uploads included, sends `expectedRevision` = the last `revision` this tab saw. That's the value from the initial load, its own save responses and its own lifecycle responses, **never from refetches**, so another tab's edit isn't silently adopted.
     - On a 409, stop the queue, keep the pending patch and set `status: "conflict"`.
     - Show `This post changed in another window. Reload to see it.` with a primary `Reload` (re-seeds from the server, dropping this tab's unsaved changes) and a ghost `Copy your text` (copies this tab's title and body markdown so nothing is lost).
@@ -159,13 +160,13 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
   - **When the editor turns read-only**, because a refetch shows `published` (the cron fired while it was open) or a save got `This post is live…`, reseed title, body, labels, cover and requests from the server. If they differed, toast `It went live before your last change saved.`.
   - Never queue saves while not editable, and make the body non-editable while a publish menu action is pending.
   - Seed the "last saved" body from the editor's own `getMarkdown()` after load, not from the stored string, so a non-identical markdown round trip doesn't fire a save on open.
-- **Cover:** a dropzone button (`Add a cover image`, note `Also used when the post is shared. Without one, Lort makes a card from the title.`) accepting click and drop. With a cover: the image plus `Replace cover` and `Remove cover` (`cover: null`). Same type and size checks as body images, and a spinner on the dropzone while uploading.
+- **Cover:** a dropzone button (`Add a cover image`, no explanatory note) accepting click and drop. With a cover: the image plus `Replace cover` and `Remove cover` (`cover: null`). Same type and size checks as body images, and a spinner on the dropzone while uploading.
 - **Formatting toolbar (`format-menu.tsx`, owner's decision):** a Tiptap `BubbleMenu` from `@tiptap/react/menus` (install `@floating-ui/dom`, which it needs), shown over a text selection or a selected image. It's a `role="toolbar"` with `aria-label="Format"`, built from shadcn `Toggle`s and Tabler icons.
   - **Text:** Bold (`IconBold`, Mod-B), Italic (`IconItalic`, Mod-I) and Link (`IconLink`, Mod-K), each `aria-pressed` when active.
   - **Link:** opens an inline URL field (`aria-label="Link address"`, placeholder `https://`) with `Apply` and, on an existing link, `Remove link`. Accept `http:`, `https:`, `mailto:` and site-relative paths; anything else shows `Use a web address, like https://example.com.`. Configure StarterKit's Link with `openOnClick: false`, `autolink: true` and an `isAllowedUri` that refuses other protocols.
   - **Image:** the toolbar shows an `Alt text` field (placeholder `Describe the image for people who can't see it`), saved as the markdown alt text. Right after an upload is inserted, the image is selected and this field focused, so alt text is the natural next step. `react-markdown` renders the alt as written.
   - It works by touch on phones, since a selection shows it, and it stays inside the viewport (floating-ui `flip` and `shift`).
-- **Untouched drafts clean themselves up (owner's decision).** When the editor unmounts or the page hides, a post that is still a draft with an empty trimmed title, an empty body, no cover, images, labels or requests, and that was never scheduled or published is deleted quietly through the record API. It uses `keepalive` on `pagehide`, with no toast. "New post" opened and abandoned leaves nothing behind.
+- **Untouched drafts clean themselves up (owner's decision).** When the editor unmounts or the page hides, a post that is still a draft with an empty trimmed title, an empty body, no cover, images, labels or requests, and that was never scheduled or published is deleted quietly through the record API. It uses `keepalive` on `pagehide`, with no toast, and sends `?ifUntouched=<revision this window last saw>`, so a window that was left alone can't remove what another window saved. On unmount the delete waits one tick and a remount cancels it, so React StrictMode's mount-cleanup-mount doesn't delete a post whose editor is still open. "New post" opened and abandoned leaves nothing behind.
 - **Labels:** shadcn `ToggleGroup` with `multiple`, group `aria-label="Labels"`, pressed = `primary-soft`/`primary-text` (canvas).
 - **Shipped in this update:** heading, secondary small `Attach a request` (Tabler `plus`) opening a popover `Command` that searches `listRequests(pbAdmin, { q, status: "pending,reviewing,planned,progress,completed,closed" })` (debounced 300 ms), listing status icon + label, title and votes, already-attached ones marked and disabled. Attached rows: compact read-only `VoteSticker`, title, status icon + ink label, ghost icon button `Detach <title>`. Order is attachment order. Empty: `Attach the requests this update ships. They'll be listed under the post.`. 50 attached → the button hides.
 - **Preview** (ghost) swaps the writing surface for `PostView` fed from the unsaved form state (title, labels, cover URL, body markdown, attached items filtered to what the public would see: `visible`, not merged, and on a board listed in `config.boards`, which holds the public boards only). The button reads `Back to editing` while previewing. The editor stays mounted (`hidden`), so undo history, scroll and caret survive the round trip.
@@ -185,7 +186,7 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
   - **Leaving early commits it.** Unmounting the editor, an editor link, or `pagehide` within the window sends the unpublish at once, as `fetch(..., { keepalive: true })` with the `Authorization` header, because the person meant it.
   - **If the call fails:** a 409 `That post isn't live.` (someone else unpublished it) counts as done. Any other failure restores the read-only state, drops the paused edits and toasts `Couldn't unpublish “<title>”. <message>`.
   - Publish and Schedule are unavailable during the window, so they can't race the pending unpublish.
-- Every action disables the menu while pending, then invalidates `["changelogs"]` and `["changelog"]` and calls `router.refresh()` so the nav flag follows.
+- Every action disables the menu while pending, then invalidates `["changelogs"]` and `["changelog"]` and calls `router.refresh()` so the nav flag follows. A publish that completed requests also invalidates `["requests"]`, `["request"]`, `["queue"]` and `keys.stats`, because `router.refresh()` keeps the QueryClient and the request views would still show them open.
 - Toasts: `Published. It's live on the changelog.`; with completions `Published, and N requests marked as completed.` (`1 request`); `Scheduled for 21 Oct, 09:00.`; `Back in drafts.`; `Unpublished. It's a draft again.` (with Undo, above). Errors toast the server message.
 - **Overflow** (`post-actions.tsx`): ghost icon button `More actions` (Tabler `dots`) with `Delete post` (danger text) for draft and scheduled posts only → `AlertDialog` `Delete “<title>”?` (`Delete this untitled post?` without a title), body `It's gone for good, along with its images.`, `Cancel` / `Delete post`. On success: back to the list, toast `Post deleted.`.
 - **Failure:** the editor of a post with `publishError` shows, above the title, `This post didn't go out at <21 Oct, 09:00>. It's back in drafts. <error>` with a ghost `Dismiss` (clears `publishError`). `failed-banner.tsx` in `DashboardShell` shows one line per failed post on every dashboard page: `“<title>” didn't go out at <21 Oct, 09:00>. It's back in drafts.` with a link `Open the post`; it polls `keys.failedPosts` every 60 s and on focus, and renders nothing when the list is empty.
@@ -219,10 +220,12 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 - A title saved as `"  Dark\nmode  "` is stored as `Dark mode`; a whitespace-only title counts as empty.
 - `site.Load` reports `changelog=false` with only drafts and `true` after one is published; the cache drops on a state change, not on a body edit.
 - `revision` rises by 1 on a title, body, labels or image change and not on a state-only save; `expectedRevision` equal to the stored value saves (and isn't stored), a stale one answers 409 with the message, a missing one skips the check, and on a published post the "live" message wins over the conflict.
+- Interleavings (a competing save or publish landing between the record API's read and the hook): a second save at the same revision answers 409 and the newer body survives; a title change on a post that just went live answers the live message and writes nothing; a `completeAttached` save on one saves and the post stays published with its `publishedAt`; deleting a post that was scheduled when read but has been published since answers `Unpublish this post before deleting it.` and the post survives.
+- `?ifUntouched=<revision>`: 409 at a stale revision, 409 for a scheduled post, 204 for an untouched draft at the revision, and a plain delete (no parameter) still works.
 
 **Done when:** `cd server && go test ./... && go vet ./...` pass.
 
-- [ ] Task 1 complete
+- [x] Task 1 complete
 
 ### Task 2: Lifecycle, reads, cron and the page-meta header
 **Files:** `server/internal/changelog/service.go`, `read.go`, `team.go`, `lifecycle.go`, `schedule.go`, `meta.go` (+tests), `server/internal/status/status.go` (+test), `server/internal/requests/service.go` (+test), `server/internal/api/changelog.go` (+test), `api.go` (one register call, `fail` cases), `server/internal/web/web.go` (+test), `server/main.go`
@@ -259,7 +262,7 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 
 **Done when:** `cd server && go test ./... && go vet ./...` pass; against a dev server, `curl -s http://127.0.0.1:4052/api/lort/changelog` returns `{"items":[],…}`.
 
-- [ ] Task 2 complete
+- [x] Task 2 complete
 
 ### Task 3: Web data layer, nav and markdown
 **Files:** `web/lib/api.ts`, `web/lib/query.ts`, `web/lib/config.ts`, `web/lib/changelog.ts`, `web/lib/time.ts`, `web/lib/prose.ts`, `web/components/board/links.ts`, `web/components/board/changelog/markdown.tsx`, `label-chips.tsx` (+tests); `package.json` (react-markdown, remark-gfm)
@@ -282,7 +285,7 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 
 **Done when:** `cd web && pnpm typecheck && pnpm lint && pnpm test` pass.
 
-- [ ] Task 3 complete
+- [x] Task 3 complete
 
 ### Task 4: Public changelog pages and the share card
 **Files:** `web/app/(board)/changelog/page.tsx`, `web/app/(board)/changelog/[slug]/page.tsx`, `web/app/changelog-card/[slug]/route.tsx`, `web/app/fonts/BricolageGrotesque-ExtraBold.ttf`, `web/components/board/changelog/*` (list, entry, post-view, shipped-list, share-button, post-missing, skeletons), `web/next.config.ts` (only if tracing needs it)
@@ -301,7 +304,7 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 
 **Done when:** unit tests pass; `/changelog`, a post and `/changelog-card/<slug>` render on the dev server in both themes.
 
-- [ ] Task 4 complete
+- [x] Task 4 complete
 
 ### Task 5: Dashboard list, sidebar and failure banner
 **Files:** `web/app/dashboard/(app)/changelog/page.tsx`, `web/components/dashboard/changelog/posts-page.tsx`, `posts-table.tsx` (+test), `posts-skeleton.tsx`, `failed-banner.tsx` (+test), `web/components/dashboard/app-sidebar.tsx`, `dashboard-shell.tsx`
@@ -318,7 +321,7 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 
 **Done when:** unit tests pass; the list renders on the dev server.
 
-- [ ] Task 5 complete
+- [x] Task 5 complete
 
 ### Task 6: The editor
 **Files:** `web/app/dashboard/(app)/changelog/[id]/page.tsx`, `web/components/dashboard/changelog/editor/*`; `package.json` (Tiptap packages); shadcn `calendar`, `checkbox`
@@ -331,7 +334,7 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 **Tests (behaviours):**
 - `useAutosave` (fake timers, mocked API):
   - Batching and order: typing within 1 s sends one save; a label change sends at once; a second save waits for the first; a slow first save can't be overwritten by a newer one.
-  - Errors: a 500 retries with `error` status and recovers. A body and a taken slug sent together end with the body saved and `fieldError.slug` set. A 401 keeps the whole patch, shows `signed-out` and resends after the auth store changes.
+  - Errors: a 500 retries with `error` status and recovers. A body and a taken slug sent together end with the body saved and `fieldError.slug` set. A 401 keeps the whole patch, shows `signed-out` and resends after the auth store changes. A body the server refuses stays unsaved: the other fields save, `status` stays `error` with the message (also after a refused upload or a full image list), `flush()` is `false`, editing the body retries it, and `discard()` drops it.
   - Uploads: two quick `upload()` calls make two requests, and each resolves to its own filename.
   - `flush`: resolves `true` after the queue drains, and `false` (without hanging) after a 400 or while signed out.
   - Unmount and delete: unmounting with a pending patch still sends it; `discard()` then delete sends nothing more.
@@ -343,11 +346,12 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 - `useAutosave` conflicts: a 409 sets `conflict`, keeps the patch and stops the queue; `revision` advances from save responses and not from refetches; `pause()` holds saves until `resume()`.
 - `useDelayedUnpublish` (fake timers): the editor turns editable at once and nothing is sent; at 10 s `unpublishPost` is called and paused edits are sent after it; Undo at 5 s sends nothing, drops the paused edits and restores read-only; unmounting at 5 s sends the unpublish at once; a 409 counts as done; a 500 restores read-only with the error toast.
 - Format menu: Mod-B and Mod-I toggle marks; a `javascript:` link is refused with the message; a selected image shows the Alt text field and the alt lands in the saved markdown as `![alt](src)`.
-- Untouched-draft cleanup: leaving a brand-new post deletes it; leaving one with only a label kept, or one that was ever scheduled, keeps it.
+- Untouched-draft cleanup: leaving a brand-new post deletes it, sending the revision it saw; under StrictMode nothing is deleted until the editor really goes; leaving one with only a label kept, or one that was ever scheduled, keeps it.
+- Publishing with completions invalidates the request, queue and stats caches as well as the changelog ones.
 
 **Done when:** unit tests pass; on the dev server a new post can be written, gets a cover and an image, autosaves, previews, and publishes.
 
-- [ ] Task 6 complete
+- [x] Task 6 complete
 
 ### Task 7: End-to-end tests, full check, commit and PR
 **Files:** `web/e2e/changelog.spec.ts` (create), `web/e2e/a11y.spec.ts`, `web/e2e/helpers.ts` (a `seedPost` helper through the team API with the admin token)
@@ -364,7 +368,7 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 
 **Done when:** `cd server && go test ./... && go vet ./...`; `cd web && pnpm typecheck && pnpm lint && pnpm test && pnpm e2e --repeat-each=2` all pass. Then one commit on `phase-2b-changelog` and a PR. Review rounds and the docs commit follow `CLAUDE.md`.
 
-- [ ] Task 7 complete
+- [x] Task 7 complete
 
 ## Manual Verification Checklist
 
@@ -398,7 +402,7 @@ This is plan 2 of Phase 2: 2A roadmap (merged), **2B changelog (this)**.
 
 #### MV-5: Cover and body images
 - **Steps:** add a 200 KB PNG as cover; add a 6 MB PNG as cover; insert a PNG through the slash menu's Image; remove the cover.
-- **Expected:** the cover shows with Replace/Remove; the 6 MB one toasts "That image is over 5 MB." and nothing changes; the body image shows inline and survives a reload; Remove cover brings back "Add a cover image" with the sharing note.
+- **Expected:** the cover shows with Replace/Remove; the 6 MB one toasts "That image is over 5 MB." and nothing changes; the body image shows inline and survives a reload; Remove cover brings back "Add a cover image".
 - **How the executor runs it:** Playwright (`setInputFiles`).
 
 #### MV-6: Slug rules
@@ -574,8 +578,18 @@ What was built, and the choices a reviewer or the next planner needs. Interfaces
 - The cover dropzone has no explanatory note.
 - An image from the slash menu is inserted at the recorded position, then found by its address and selected (an e2e test covers it).
 
-**Verification**
-- The Manual Verification Checklist was run with Playwright against the e2e stack (dark theme; MV-30 by restarting the Go server on a SQLite file with backdated `publishAt` values). All items pass. MV-2's "Untitled post" row only exists while an abandoned draft does, so it is checked as MV-29 describes: untouched drafts are deleted.
-- Left for a person (`[user-only]`): how the share card looks, Preview against `P-Changelog-Post`, and touch selection and typing in Tiptap on a real phone.
+**Review rounds** (PR #7)
+- Round 1 found six real problems, all fixed with a failing test first:
+  - The record API's update and delete hooks checked a copy of the post read before the write, so overlapping saves, or a save and a publish, could overwrite each other, and a post published meanwhile could be deleted. They now re-read inside the write transaction (see Key Decisions, Edit conflicts and Data).
+  - A field the server refuses stays unsaved work instead of vanishing from the queue.
+  - The abandoned-draft clean-up no longer fires from StrictMode's mount cleanup, and it is conditional on the revision the window saw (`?ifUntouched=`).
+  - Publishing with completions refreshes the request caches.
+- Round 2 found one: after a refused body, a refused upload or the full-image-list error left the save state on `Saving…`. The queue now tells sendable work (`unsent()`) from refused fields (`settledState()`).
+- Go integration tests drive the interleavings with a hook bound ahead of the changelog's own, which commits a competing save or publish between the record API's read and the hook (`raceUpdate` in `hooks_test.go`).
 
-For the next stage: Phase 3's email hooks into `changelog.Service.publish` (the one path for Publish and the cron) and `requests.Service.Ship`. `lastEmailedAt` exists but is never written. Review rounds and the docs commit still follow `CLAUDE.md`.
+**Verification**
+- The Manual Verification Checklist was run with Playwright against the e2e stack (dark theme; MV-30 by restarting the Go server on a SQLite file with backdated `publishAt` values). All items passed. MV-2's "Untitled post" row only exists while an abandoned draft does, so it is checked as MV-29 describes: untouched drafts are deleted.
+- After the review rounds `go vet`, `go test ./...` (no `-race`: no C compiler here), `pnpm typecheck`, `pnpm lint` and `pnpm test` pass. The Playwright suite runs in CI; it was not re-run locally after the review fixes.
+- Not checked by a person: how the share card looks, Preview against `P-Changelog-Post`, and touch selection and typing in Tiptap on a real phone.
+
+**For the next stage:** Phase 3's email hooks into `changelog.Service.publish` (the one path for Publish and the cron) and `requests.Service.Ship`. `lastEmailedAt` exists but is never written.
