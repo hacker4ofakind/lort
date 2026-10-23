@@ -56,7 +56,7 @@ export const SlugField = forwardRef<
           }}
         />
         {fixed && (
-          <InputGroupAddon align="inline-end" className="pr-3.5 pl-4">
+          <InputGroupAddon align="inline-end" className="pr-3.5">
             <Tooltip>
               <TooltipTrigger
                 render={<button type="button" aria-label={FIXED_HINT} className="inline-flex rounded-full hover:text-foreground" />}
