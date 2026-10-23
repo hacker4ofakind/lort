@@ -9,8 +9,8 @@ import { useAdminSession } from "@/components/dashboard/session"
 import { LogoMark } from "@/components/lort/logo-mark"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 
-// Pages that need the width open with the sidebar as the 76px rail, whatever it was left at:
-// the roadmap and the changelog editor (not the changelog list).
+// Pages that need the width: the roadmap and the changelog editor (not the changelog list). Opened
+// directly they start with the sidebar as the 76px rail; reached from another page they keep it.
 const DENSE_PAGES = [/^\/dashboard\/roadmap/, /^\/dashboard\/changelog\/[^/]+$/]
 
 export function isDense(pathname: string): boolean {
@@ -33,7 +33,9 @@ export function DashboardShell({ defaultOpen, children }: { defaultOpen: boolean
   const [lastPath, setLastPath] = useState(pathname)
   if (lastPath !== pathname) {
     setLastPath(pathname)
-    setVisitOpen(false)
+    // Arriving from a normal page keeps the sidebar as it is, so flipping through the pages
+    // doesn't animate it; only opening a dense page directly starts it as the rail.
+    if (!isDense(lastPath)) setVisitOpen(remembered)
   }
   return (
     <SidebarProvider
