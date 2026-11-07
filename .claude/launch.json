@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "lort-server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["web/e2e/server.mjs"],
+      "port": 4052
+    },
+    {
+      "name": "lort-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "web", "dev"],
+      "port": 3000
+    }
+  ]
+}
