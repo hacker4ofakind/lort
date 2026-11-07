@@ -5,7 +5,9 @@ import { SettingRow, SettingsSection } from "@/components/dashboard/settings/sec
 import type { Settings } from "@/components/dashboard/settings/use-settings"
 import { LogoMark } from "@/components/lort/logo-mark"
 import { Button } from "@/components/ui/button"
+import { ColorPicker, hexToHsv, hsvToHex } from "@/components/dashboard/settings/color-picker"
 import { Input } from "@/components/ui/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Switch } from "@/components/ui/switch"
 import { Toggle } from "@/components/ui/toggle"
 import { ToggleGroup } from "@/components/ui/toggle-group"
@@ -30,6 +32,7 @@ export function BrandingSection({ settings: s, save }: { settings: Settings; sav
   const [name, setName] = useState(s.appName)
   const [hex, setHex] = useState(s.primaryColor)
   const [hexError, setHexError] = useState("")
+  const [hsv, setHsv] = useState(() => hexToHsv(HEX.test(s.primaryColor) ? s.primaryColor : "#cc3a6d"))
   const logo = s.logo ? fileUrl("settings", s.id, s.logo) : ""
   const color = s.primaryColor.toLowerCase()
 
@@ -96,15 +99,33 @@ export function BrandingSection({ settings: s, save }: { settings: Settings; sav
               />
             ))}
           </ToggleGroup>
-          <label className="flex items-center gap-2 text-caption font-normal text-muted-foreground">
+          <div className="flex items-center gap-2 text-caption font-normal text-muted-foreground">
             Custom
             {/* A live preview the size of the presets: what you've typed once it's a valid hex,
                 otherwise the saved colour. */}
-            <span
-              aria-hidden
-              className="size-[30px] shrink-0 rounded-full"
-              style={{ backgroundColor: HEX.test(hex.trim()) ? hex.trim() : s.primaryColor }}
-            />
+            <Popover
+              onOpenChange={(open) => {
+                if (open) return setHsv(hexToHsv(HEX.test(hex.trim()) ? hex.trim() : s.primaryColor))
+                const v = hex.trim().toLowerCase()
+                if (HEX.test(v) && v !== color) void save({ primaryColor: v }, "Saved the colour.")
+              }}
+            >
+              <PopoverTrigger
+                aria-label="Pick a custom colour"
+                className="size-[30px] shrink-0 cursor-pointer rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                style={{ backgroundColor: HEX.test(hex.trim()) ? hex.trim() : s.primaryColor }}
+              />
+              <PopoverContent align="end" className="w-auto">
+                <ColorPicker
+                  hsv={hsv}
+                  onChange={(next) => {
+                    setHsv(next)
+                    setHex(hsvToHex(next))
+                    setHexError("")
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
             <Input
               aria-label="Custom hex colour"
               aria-invalid={!!hexError}
@@ -118,7 +139,7 @@ export function BrandingSection({ settings: s, save }: { settings: Settings; sav
                 if (v.toLowerCase() !== color) void save({ primaryColor: v.toLowerCase() }, "Saved the colour.")
               }}
             />
-          </label>
+          </div>
           {hexError && (
             <p role="alert" className="text-caption font-medium text-danger">
               {hexError}
