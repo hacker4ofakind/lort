@@ -82,7 +82,7 @@ bash test/e2e-container.sh lort
 cd web && LORT_E2E_CONTAINER=1 pnpm e2e
 ```
 
-`test/container.sh` checks the image the way an owner runs it: the exact run line, a root-owned volume, bad settings, a wrong key, a graceful stop, and the setup wizard. `test/e2e-container.sh` starts the image on port 4052 for Playwright (`--stop` removes it). The setup scripts have their own tests: `bash test/wrapper.test.sh` and `Invoke-Pester test/wrapper.Tests.ps1`.
+`test/container.sh` checks the image the way an owner runs it: the exact run line, a root-owned volume, bad settings, a wrong key, a graceful stop, a writable Next cache in a read-only app tree, and the setup wizard. `test/e2e-container.sh` starts the image on port 4052 for Playwright (`--stop` removes it). The setup scripts have their own tests: `bash test/wrapper.test.sh` and `Invoke-Pester test/wrapper.Tests.ps1`.
 
 ## Security notes
 
