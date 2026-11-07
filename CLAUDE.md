@@ -19,7 +19,7 @@ The review can't post on the PR, so its findings always arrive in the chat. Don'
 
 ## Merging a PR
 
-A PR is ready to merge only when all of these are done: CI checks pass, both review rounds have been handled, and the docs commit is pushed. Then:
+A PR is ready to merge only when all of these are done: CI checks pass, both review rounds have been handled, and the docs commit is pushed. CI only needs to pass on the last commit that changed code; a docs-only commit after it (Markdown, specs, plans) doesn't need its own CI run, so merge without waiting for it. Then:
 
 1. Squash-merge it (`gh pr merge <number> --squash --delete-branch`, with the PR number in the commit title, like `… (#6)`).
 2. Delete the branch both remotely and locally. `--delete-branch` covers the remote; check the local branch is gone too (switch to `main`, pull, then `git branch -d <branch>` if it is still there) and run `git fetch --prune`.
