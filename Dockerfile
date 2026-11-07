@@ -28,6 +28,9 @@ FROM node:24-alpine${ALPINE_VERSION} AS node
 FROM node AS node-bin
 RUN apk add --no-cache binutils && strip /usr/local/bin/node -o /out-node
 
+# The app tree stays root-owned and read-only to lort. The one exception is .next/cache, where Next
+# writes the optimized images (cache/images) and the fetch cache (cache/fetch-cache) at run time;
+# the web stage creates it owned by lort (uid 10001), and the final COPY keeps that.
 FROM node AS web
 # First, so this stage starts only once the Go build has finished.
 COPY --from=server /out/built /tmp/server-built
@@ -44,7 +47,7 @@ RUN pnpm build \
  && mkdir -p /out \
  && cp -a .next/standalone /out/web \
  && cp -a .next/static /out/web/.next/static \
- && if [ -d public ]; then cp -a public /out/web/public; fi
+ && if [ -d public ]; then cp -a public /out/web/public; fi  && mkdir /out/web/.next/cache  && chown 10001:10001 /out/web/.next/cache
 
 # The runtime's whole filesystem: musl, busybox (the entrypoint's sh, find, chown), node's two
 # libraries, tini, setpriv and the CA bundle. No apk, OpenSSL or zlib: node and lort bring their own.

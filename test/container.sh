@@ -121,6 +121,10 @@ check "the healthcheck passes" docker exec "$id-one" lort healthcheck
 procs=$(docker top "$id-one" -o pid,uid,args | tail -n +2)
 check "tini, lort and Next all run as uid 10001" bash -c '[ "$(grep -cE "tini|lort|next-server" <<<"$1")" -ge 3 ] && [ -z "$(awk "\$2 != 10001" <<<"$1")" ]' _ "$procs"
 check "the database belongs to uid 10001" test "$(uid_of "$id-one" /data/pb_data/data.db)" = 10001
+for page in / /changelog /roadmap; do curl -s -o /dev/null "http://127.0.0.1:$port$page" || true; done
+check "Next can write its cache (no EACCES in the log)" bash -c '! docker logs "$1" 2>&1 | grep -q EACCES' _ "$id-one"
+check "uid 10001 owns .next/cache" test "$(uid_of "$id-one" /app/web/.next/cache)" = 10001
+check "but not the rest of the app" bash -c '! docker exec -u lort "$1" sh -c "touch /app/web/server.js 2>/dev/null || mkdir /app/web/.next/x 2>/dev/null"' _ "$id-one"
 check "sends security headers" bash -c "curl -sI 'http://127.0.0.1:$port/feedback' | grep -qi '^referrer-policy: strict-origin-when-cross-origin'"
 
 # reset-admin, password from stdin, starting with a dash.
