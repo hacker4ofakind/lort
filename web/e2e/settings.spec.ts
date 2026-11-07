@@ -1,5 +1,12 @@
-import { expect, test } from "@playwright/test"
+import { expect, test, type Page } from "@playwright/test"
 import { setRoadmapPublic, signInAdmin, unique } from "./helpers"
+
+// Settings saves are silent (only adding admins and editing boards toast), so a test waits for
+// the save itself to come back from PocketBase before it looks at the result.
+const saved = (page: Page, collection: string) =>
+  page.waitForResponse(
+    (r) => r.url().includes(`/api/collections/${collection}/records`) && ["PATCH", "POST"].includes(r.request().method()) && r.ok(),
+  )
 
 test.beforeEach(async ({ page }) => {
   await signInAdmin(page)
@@ -10,15 +17,19 @@ test("renaming the app changes the board", async ({ page }) => {
   const name = `Driftnote ${unique()}`
   const field = page.getByLabel("App name")
   await field.fill(name)
+  const renamed = saved(page, "settings")
   await field.press("Enter")
-  await expect(page.getByText("Saved the app name.")).toBeVisible()
+  await renamed
   await page.goto("/feedback")
   await expect(page.getByRole("heading", { level: 1, name: `Got an idea for ${name}?` })).toBeVisible()
 
   await page.goto("/dashboard/settings")
   await page.getByLabel("App name").fill("Driftnote")
+  const restored = saved(page, "settings")
   await page.getByLabel("App name").press("Enter")
-  await expect(page.getByText("Saved the app name.")).toBeVisible()
+  await restored
+  await page.reload()
+  await expect(page.getByLabel("App name")).toHaveValue("Driftnote")
 })
 
 test("boards can be added, renamed, reordered with the keyboard and deleted", async ({ page }) => {
@@ -61,7 +72,7 @@ test("tags can be added and deleted", async ({ page }) => {
   await page.getByRole("button", { name: "Add a tag" }).click()
   await page.getByLabel("New tag").fill(tag)
   await page.getByRole("button", { name: "Add", exact: true }).click()
-  await expect(page.getByText("Added the tag.")).toBeVisible()
+  await expect(page.locator("#tags").getByRole("button", { name: tag, exact: true })).toBeVisible()
   await page.locator("#tags").getByRole("button", { name: tag, exact: true }).click()
   await page.getByRole("button", { name: "Delete", exact: true }).click()
   await expect(page.locator("#tags").getByRole("button", { name: tag, exact: true })).toHaveCount(0)
@@ -69,15 +80,20 @@ test("tags can be added and deleted", async ({ page }) => {
 
 test("the landing card can be switched off", async ({ page }) => {
   const toggle = page.getByRole("switch", { name: "Show “Get your own board” card" })
+  const hidden = saved(page, "settings")
   await toggle.click()
-  await expect(page.getByText("Hid the card.")).toBeVisible()
+  await hidden
+  await expect(toggle).not.toBeChecked()
   await page.goto("/feedback")
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
   await expect(page.getByText("Get your own board like this")).toHaveCount(0)
 
   await page.goto("/dashboard/settings")
+  const back = saved(page, "settings")
   await page.getByRole("switch", { name: "Show “Get your own board” card" }).click()
-  await expect(page.getByText("The card is back.")).toBeVisible()
+  await back
+  await page.goto("/feedback")
+  await expect(page.getByText("Get your own board like this")).toBeVisible()
 })
 
 test("an invited admin sets a password and lands in the dashboard", async ({ page, browser }) => {
@@ -117,8 +133,10 @@ test("the roadmap can be switched off and on, and the pill and pages follow", as
   const toggle = page.getByRole("switch", { name: "Show the roadmap publicly" })
   const nav = page.getByRole("navigation", { name: "Board" })
   try {
+    const off = saved(page, "settings")
     await toggle.click()
-    await expect(page.getByText("The roadmap is hidden from the board.")).toBeVisible()
+    await off
+    await expect(toggle).not.toBeChecked()
 
     await page.goto("/feedback")
     await expect(nav.getByRole("link", { name: "Feedback" })).toBeVisible()
@@ -137,8 +155,10 @@ test("the roadmap can be switched off and on, and the pill and pages follow", as
     await page.getByRole("link", { name: "Turn it on in Settings." }).click()
     await page.waitForURL(/\/dashboard\/settings#roadmap/)
 
+    const on = saved(page, "settings")
     await page.getByRole("switch", { name: "Show the roadmap publicly" }).click()
-    await expect(page.getByText("The roadmap is public.")).toBeVisible()
+    await on
+    await expect(page.getByRole("switch", { name: "Show the roadmap publicly" })).toBeChecked()
     await page.goto("/feedback")
     await expect(nav.getByRole("link", { name: "Roadmap" })).toBeVisible()
     await page.goto("/roadmap")

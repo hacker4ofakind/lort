@@ -138,8 +138,10 @@ test("the collapsed rail keeps its links' names", async ({ page }) => {
   const nav = page.locator("[data-sidebar=sidebar]")
   await expect(nav.getByRole("link", { name: "Requests" })).toBeVisible()
   await expect(nav.getByRole("link", { name: "Settings" })).toBeVisible()
-  // The labels are for screen readers only: each item is just its icon.
-  expect((await nav.getByRole("link", { name: "Settings" }).boundingBox())!.width).toBeLessThanOrEqual(44)
+  // The labels are for screen readers only: each item is just its icon. The pills shrink into the
+  // rail over 200ms, so wait for that to finish before measuring.
+  const settings = nav.getByRole("link", { name: "Settings" })
+  await expect.poll(async () => (await settings.boundingBox())!.width).toBeLessThanOrEqual(44)
   await page.getByRole("button", { name: "Expand sidebar" }).click()
 })
 
