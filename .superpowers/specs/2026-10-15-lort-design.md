@@ -106,7 +106,7 @@ web/           Next.js (App Router, output: 'standalone') + shadcn/ui + Tailwind
 docs/          Markdown docs, embedded in the Go binary and rendered at /dashboard/docs
 mcp/docs.mjs   zero-dependency stdio MCP server exposing docs/ before Lort is installed
 design/        the design: canvases and a reference build of the components (visual reference only, never copied into web/)
-Dockerfile     multi-stage: Go build → Node build (pnpm, waits for the Go stage) → slim runtime (node:24-trixie-slim + tini)
+Dockerfile     multi-stage: Go build → Node build (pnpm, waits for the Go stage) → runtime FROM scratch: a minimal Alpine root (musl, busybox, libstdc++, libgcc, tini, setpriv, CA bundle, made with apk --root) plus a stripped node binary from node:24-alpine. All stages are Alpine, so the sharp binary Next traces in is the musl one.
 docker-entrypoint.sh
 setup.sh, setup.ps1
 test/          container.sh (checks a built image), e2e-container.sh (starts it for Playwright), e2e.env (the e2e admin),
