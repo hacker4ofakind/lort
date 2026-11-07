@@ -47,7 +47,9 @@ RUN pnpm build \
  && mkdir -p /out \
  && cp -a .next/standalone /out/web \
  && cp -a .next/static /out/web/.next/static \
- && if [ -d public ]; then cp -a public /out/web/public; fi  && mkdir /out/web/.next/cache  && chown 10001:10001 /out/web/.next/cache
+ && if [ -d public ]; then cp -a public /out/web/public; fi \
+ && mkdir /out/web/.next/cache \
+ && chown 10001:10001 /out/web/.next/cache
 
 # The runtime's whole filesystem: musl, busybox (the entrypoint's sh, find, chown), node's two
 # libraries, tini, setpriv and the CA bundle. No apk, OpenSSL or zlib: node and lort bring their own.
