@@ -6,9 +6,9 @@
 
 **Specs:** `.superpowers/specs/2026-10-15-lort-design.md` (parent, already updated for this plan): 1.1-1.4, 2.1, 2.3, 12, 13 (phase 1). This replaces an earlier 1C plan that put the wizard in two hand-mirrored scripts; its stress-test review is why the design below differs.
 
-**Architecture:** A multi-stage `Dockerfile` builds the Go binary and the Next.js standalone server into a slim Debian + Node image: `tini` → an entrypoint that fixes `/data` ownership and drops to uid 10001 → `lort`, which supervises Next. `lort setup` (Go, in the image) asks the questions, checks DNS, writes `.env` and creates the admin inside the data volume; the wrappers only check Docker/git/ports, build the image and run the wizard as a throwaway container. The server gains what a container needs: settings checks with clear refusals, settings encryption, a sender-checked trust in `X-Forwarded-For`, and a graceful stop.
+**Architecture:** A multi-stage `Dockerfile` builds the Go binary and the Next.js standalone server into an Alpine image (a scratch runtime with a minimal apk root and a stripped node binary): `tini` → an entrypoint that fixes `/data` ownership and drops to uid 10001 → `lort`, which supervises Next. `lort setup` (Go, in the image) asks the questions, checks DNS, writes `.env` and creates the admin inside the data volume; the wrappers only check Docker/git/ports, build the image and run the wizard as a throwaway container. The server gains what a container needs: settings checks with clear refusals, settings encryption, a sender-checked trust in `X-Forwarded-For`, and a graceful stop.
 
-**Tech Stack:** Docker (BuildKit), `golang:1.27-trixie`, `node:24-trixie-slim`, tini, `setpriv`; Go 1.27 + PocketBase v0.40.5 (`golang.org/x/term` for hidden input); bash 3.2-compatible `setup.sh`, PowerShell 7.4+ `setup.ps1`; shellcheck, PSScriptAnalyzer 1.25.0, Pester 5.7.1; GitHub Actions (`actions/checkout@v7`, `actions/setup-go@v7`, `actions/setup-node@v7`, `pnpm/action-setup@v6`, `docker/setup-buildx-action@v4`, `docker/build-push-action@v7`, `actions/upload-artifact@v7`); Playwright 1.64; `next/font/local`.
+**Tech Stack:** Docker (BuildKit), `golang:1.27-alpine`, `node:24-alpine`, `alpine` (runtime root built FROM scratch), tini, `setpriv`; Go 1.27 + PocketBase v0.40.5 (`golang.org/x/term` for hidden input); bash 3.2-compatible `setup.sh`, PowerShell 7.4+ `setup.ps1`; shellcheck, PSScriptAnalyzer 1.25.0, Pester 5.7.1; GitHub Actions (`actions/checkout@v7`, `actions/setup-go@v7`, `actions/setup-node@v7`, `pnpm/action-setup@v6`, `docker/setup-buildx-action@v4`, `docker/build-push-action@v7`, `actions/upload-artifact@v7`); Playwright 1.64; `next/font/local`.
 
 ## Global Constraints
 
@@ -332,7 +332,7 @@
 
 **Review fixes** (round 1 `e022b69`, round 2 `b3a64af`)
 - `lort healthcheck` reads each page to the end; a page that sends 200 and stalls is unhealthy (`checkHealth(client, base)` is the testable part).
-- Ownership repair covers the whole volume: the entrypoint runs `find /data ( ! -uid 10001 -o ! -gid 10001 ) -print -quit` and then one `chown -R -h`; `ownData` re-owns each mismatched entry with `Lchown`. Neither follows symlinks. This is a full walk of a healthy volume at every boot, cheap at Lort's sizes but worth revisiting if uploads grow large.
+- Ownership repair covers the whole volume: the entrypoint runs `find /data ( ! -user 10001 -o ! -group 10001 ) -print -quit` and then one `chown -R -h`; `ownData` re-owns each mismatched entry with `Lchown`. Neither follows symlinks. This is a full walk of a healthy volume at every boot, cheap at Lort's sizes but worth revisiting if uploads grow large.
 - `AppAdmin.find`: the exact match first (`FindAuthRecordByEmail`), then a Go `strings.EqualFold` scan of all superusers that accepts exactly one match. PocketBase v0.40.5's `_superusers` email index is case-sensitive, and SQLite's `LOWER` is ASCII-only, so neither could do it. The installer email never matches.
 
 **Surprises**

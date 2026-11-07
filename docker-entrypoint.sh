@@ -10,7 +10,7 @@ set -eu
 data=/data
 if [ "$(id -u)" = 0 ]; then
 	mkdir -p "$data/pb_data"
-	if [ -n "$(find "$data" \( ! -uid 10001 -o ! -gid 10001 \) -print -quit)" ]; then
+	if [ -n "$(find "$data" \( ! -user 10001 -o ! -group 10001 \) -print -quit)" ]; then
 		echo "Giving $data to the lort user (uid 10001)."
 		chown -R -h 10001:10001 "$data"
 	fi
